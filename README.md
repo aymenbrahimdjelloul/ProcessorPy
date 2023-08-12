@@ -35,6 +35,21 @@ print(my_cpu.name)
 
 ~~~
 
+Sensors Usage
+-----
+~~~python
+# Import the Sensors class from ProcessorPy
+from ProcessorPy import Sensors
+
+# Create Sensors object
+sensor = Sensors()
+
+# Print out the current cpu clock speed in mhz
+print(sensor.get_cpu_clock_speed())
+
+~~~
+
+
 <h2>License</h2>
 <h4>This project is published under MIT License </h4>
 
