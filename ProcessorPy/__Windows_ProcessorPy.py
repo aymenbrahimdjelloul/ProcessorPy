@@ -62,6 +62,10 @@ class Processor(ProcessorPyCore):
         """ This method will return the cpu flags"""
         return None    # This method isn't maintained yet it will be updated later
 
+    def l1_cache_size(self, fiendly_format: bool = True) -> str | int | None:
+        """ This method will return the level 1 cpu cache size"""
+        return None    # This method isn't maintained yet it will be updated later
+    
     def l2_cache_size(self, friendly_format: bool = True) -> str | int | None:
         """ This method will return the level 2 cpu cache size"""
 
