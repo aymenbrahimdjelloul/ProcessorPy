@@ -2,6 +2,7 @@
 <!-- GitHub README.md -->
 
 <h1>ProcessorPy</h1>
+
 <p>
 ProcessorPy is Cross-platform pure python library thats provide access to most of CPU specifications and sensors-readings with an easy and fast way
 </p>
