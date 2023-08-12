@@ -52,6 +52,7 @@ class Processor(ProcessorPyCore):
         """ This method will return the cpu stepping value"""
         return self.__get_win32_procesor_info("Stepping")
 
+    @property
     def socket(self):
         """ This method will return the cpu socket"""
         return self.__get_win32_procesor_info("SocketDesignation")
