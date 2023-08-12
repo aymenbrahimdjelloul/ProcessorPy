@@ -21,7 +21,7 @@ ProcessorPy is Cross-platform pure python library thats provide access to most o
 </p1>
 
 
-Usage
+Simple Usage
 -----
 ~~~python
 # First import the Processor class from ProcessorPy
