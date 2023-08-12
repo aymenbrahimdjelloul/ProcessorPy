@@ -22,6 +22,12 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 
 <h2>Testing</h2>
 
+| Name      | Age | Location      |
+|-----------|-----|---------------|
+| John Doe  | 30  | New York City |
+| Jane Smith| 25  | San Francisco|
+
+
 Simple Usage
 -----
 ~~~python
