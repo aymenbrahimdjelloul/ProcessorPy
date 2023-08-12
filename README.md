@@ -2,9 +2,8 @@
 
 <h1>ProcessorPy</h1>
 
-<p>
-BatteyPy is a lightweight and pure-python library for Windows that allow you to retreive your device battery information and status so easy and fast !
-</p>
+<p>ProcessorPy is a Cross-platform, Pure python Library that's will get CPU information's & specifications also it's provide a sensors readings.
+ProcessorPy should do it without any external dependecies or any kind of C/C++ or Assembly scripts, It's piece of a pure-python work for both Windows and Linux-debian systems</p>
 
 <h2>Features</h2>
 
