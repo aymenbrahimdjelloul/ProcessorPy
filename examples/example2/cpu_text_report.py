@@ -10,7 +10,13 @@ my_cpu = Processor()
 
 # Define filename and report file path variable
 filename = "cpu-report.txt"
-file_path = "C:\\User\\[Your PC Name]\\Desktop\\"
+path = "C:\\User\\[Your PC Name]\\Desktop\\"
 
-# Get the cpu text report
-my_cpu.get_text_report()
+# Get the cpu text report and save it with your path and name
+save_path = my_cpu.get_text_report(file_path=path, filename=filename)
+
+# NOTE : if you didn't specified a filename or file path it will be saved in the same library directory 
+        The saved file path will be returned
+
+# Print out the file saved path
+print(save_path)
