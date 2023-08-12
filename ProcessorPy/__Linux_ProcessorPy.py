@@ -68,6 +68,10 @@ class Processor(ProcessorPyCore):
         """ This method will return the cpu stepping value"""
         return self.__get_text_info(r"Stepping:")
 
+    def socket(self) -> str | None:
+        """ This method will return the cpu socket"""
+        return None    # This method isnt maintined yed it will be updated later
+    
     @property
     def flags(self) -> list | None:
         """ This method will return the cpu flags"""
