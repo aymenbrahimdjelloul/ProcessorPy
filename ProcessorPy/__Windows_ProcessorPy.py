@@ -14,19 +14,16 @@ sources :
 
 # IMPORTS
 import sys
-import re
-import os
 import subprocess
 import platform
 from threading import Thread
-from __ProcessorPy_core import ProcessorPyCore, ProcessorPyResult, SensorsResult, ceil
-from exceptions import *
+from __ProcessorPy_core import ProcessorPyCore, ProcessorPyResult, SensorsResult
 
 
 class Processor(ProcessorPyCore):
 
     def __init__(self):
-        super(Processor, self).__init__()
+        super(Processor, self).__init__(self)
 
         # Get powershell path
         self.__powershell_path = "C:\\Windows\\System32\\WindowsPowershell\\v1.0\\powershell.exe"
@@ -34,12 +31,12 @@ class Processor(ProcessorPyCore):
     @property
     def name(self) -> str | None:
         """ This method will return the cpu model name"""
-        return self.__get_Win32_processor_info("Name")
+        return self.__get_win32_procesor_info("Name")
 
     @property
     def manufacturer(self) -> str | None:
         """ This method will return the cpu manufacturer name"""
-        return self.__get_Win32_processor_info("Manufacturer")
+        return self.__get_win32_procesor_info("Manufacturer")
 
     @property
     def architecture(self) -> str:
@@ -49,48 +46,48 @@ class Processor(ProcessorPyCore):
     @property
     def family(self) -> str | None:
         """ This method will return the cpu family value"""
-        return self.__get_Win32_processor_info("Family")
+        return self.__get_win32_procesor_info("Family")
 
     def stepping(self) -> str:
         """ This method will return the cpu stepping value"""
-        return self.__get_Win32_processor_info("Stepping")
+        return self.__get_win32_procesor_info("Stepping")
 
     def socket(self):
         """ This method will return the cpu socket"""
-        return self.__get_Win32_processor_info("SocketDesignation")
+        return self.__get_win32_procesor_info("SocketDesignation")
 
     def l2_cache_size(self, friendly_format: bool = True) -> str | int | None:
         """ This method will return the level 2 cpu cache size"""
 
-        return int(self.__get_Win32_processor_info("L2CacheSize")) if not friendly_format else \
-            self._ProcessorPyCore__kilobytes_to_megabytes(int(self.__get_Win32_processor_info("L2CacheSize")))
+        return int(self.__get_win32_procesor_info("L2CacheSize")) if not friendly_format else \
+            self._ProcessorPyCore__kilobytes_to_megabytes(int(self.__get_win32_procesor_info("L2CacheSize")))
 
     def l3_cache_size(self, friendly_format: bool = True) -> str | int | None:
         """ This method will return the level 3 cpu cache size"""
 
-        return int(self.__get_Win32_processor_info("L3CacheSize")) if not friendly_format else \
-            f'{self._ProcessorPyCore__kilobytes_to_megabytes(int(self.__get_Win32_processor_info("L3CacheSize")))} Mb'
+        return int(self.__get_win32_procesor_info("L3CacheSize")) if not friendly_format else \
+            f'{self._ProcessorPyCore__kilobytes_to_megabytes(int(self.__get_win32_procesor_info("L3CacheSize")))} Mb'
 
     def max_clock_speed(self, friendly_format: bool = True) -> str | int | None:
         """ This method will return the maximum cpu clock speed"""
 
-        return int(self.__get_Win32_processor_info("MaxClockSpeed")) if not friendly_format else \
-            f'{self.ProcessorPyCore__megahertz_to_gigahertz(int(self.__get_Win32_processor_info("MaxClockSpeed")))} Mb'
+        return int(self.__get_win32_procesor_info("MaxClockSpeed")) if not friendly_format else \
+            f'{self.ProcessorPyCore__megahertz_to_gigahertz(int(self.__get_win32_procesor_info("MaxClockSpeed")))} Mb'
 
-    def is_turbo_boosted(self) -> bool | None:
-        """ This method will return if the has boost clock or not"""
+    # def is_turbo_boosted(self) -> bool | None:
+    #     """ This method will determine if the cpu is turbo boosted feature"""
 
-    def is_virtualized(self) -> bool | None:
+    def is_support_virtualization(self) -> bool | None:
         """ This method will return if the cpu support virtualization technology or not"""
-        return True if self.__get_Win32_processor_info("VirtualizationFirmwareEnabled") == " True" else False
+        return True if self.__get_win32_procesor_info("VirtualizationFirmwareEnabled") == " True" else False
 
     def core_count(self, logical: bool = False) -> int:
         """ This method will return the cpu cores and treads count number"""
 
-        return self.__get_Win32_processor_info("ThreadCount") if logical else \
-            int(self.__get_Win32_processor_info("NumberOfCores"))
+        return self.__get_win32_procesor_info("ThreadCount") if logical else \
+            int(self.__get_win32_procesor_info("NumberOfCores"))
 
-    def __get_Win32_processor_info(self, query: str) -> str | None:
+    def __get_win32_procesor_info(self, query: str) -> str | None:
         """ This method will make a command in powershell to get the cpu info"""
 
         _process_output = subprocess.check_output([self.__powershell_path, "Get-WmiObject", "-Class", "Win32_Processor",
@@ -180,7 +177,7 @@ class Sensors(ProcessorPyCore):
         # Return result
         return cpu_usage
 
-    def get_voltage(self, friendly_format: bool = True) -> int | str | None:
+    def get_cpu_voltage(self, friendly_format: bool = True) -> int | str | None:
         """ This method will return the cpu voltage value"""
 
         # Get voltage using WMIC API
