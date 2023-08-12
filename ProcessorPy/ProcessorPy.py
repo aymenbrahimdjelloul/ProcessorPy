@@ -21,7 +21,7 @@ if __name__ != "__main__":
         from __Windows_ProcessorPy import Processor, Sensors
 
     elif system() == "Linux":
-        from __Linux_ProcessorPy import Processor
+        from __Linux_ProcessorPy import Processor, Sensors
 
     else:
         raise NotSupportedPlatform(system())
