@@ -56,6 +56,11 @@ class Processor(ProcessorPyCore):
         """ This method will return the cpu socket"""
         return self.__get_win32_procesor_info("SocketDesignation")
 
+    @property
+    def flags(self) -> list | None:
+        """ This method will return the cpu flags"""
+        return None    # This method isn't maintained yet it will be updated later
+
     def l2_cache_size(self, friendly_format: bool = True) -> str | int | None:
         """ This method will return the level 2 cpu cache size"""
 
