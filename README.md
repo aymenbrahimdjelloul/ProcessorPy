@@ -17,14 +17,11 @@ ProcessorPy is Cross-platform pure python library thats provide access to most o
 -[x] Pure python (No need for external dependencies)
 
 <h2>How It's Work ?</h2>
-<p1>ProcessorPy do it perfect job using multiple methods and system built-in tools in both Windows and Linux-Debian systems</p1>
+<p1>ProcessorPy do it perfect job by using multiple methods and system built-in tools in both Windows and Linux-Debian systems,
+  ProcessorPy parse the output of the operating system built-in tools and return it as friendly-user inforamtion's
+</p1>
 
 <h2>Testing</h2>
-| Header 1 | Header 2 | Header 3 |
-|----------|----------|----------|
-| Row 1, Col 1 | Row 1, Col 2 | Row 1, Col 3 |
-| Row 2, Col 1 | Row 2, Col 2 | Row 2, Col 3 |
-
 
 Simple Usage
 -----
