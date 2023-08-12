@@ -24,7 +24,14 @@ ProcessorPy is Cross-platform pure python library thats provide access to most o
 Usage
 -----
 ~~~python
+# First import the Processor class from ProcessorPy
+from ProcessorPy import Processor
 
+# Create a Processor Object
+my_cpu = Processor()
+
+# Print out your CPU Name !
+print(my_cpu.name)
 
 ~~~
 
