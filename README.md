@@ -21,7 +21,7 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 </p1>
 
 <h2>Testing</h2>
-<h4>ProcessorPy is Tested and worked in this Operating Systems</h4>
+<h4>ProcessorPy is Tested and worked succesfully on this platforms</h4>
 
 | OS      | CPU Platform |  Worked Succefully  |
 |-----------|---------------|-------------------|
