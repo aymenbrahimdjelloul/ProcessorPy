@@ -21,11 +21,11 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 </p1>
 
 <h2>Testing</h2>
+<h4>ProcessorPy is Tested and worked in this Operating Systems</h4>
 
-| Name      | Age | Location      |
-|-----------|-----|---------------|
-| John Doe  | 30  | New York City |
-| Jane Smith| 25  | San Francisco|
+| OS      | CPU Platform |  Worked Succefully  |
+|-----------|---------------|-------------------|
+| Widnwows 11 Pro  | AMD Ryzen 3 3200G | YES |
 
 
 Simple Usage
