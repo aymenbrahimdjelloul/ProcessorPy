@@ -7,6 +7,8 @@ license : MIT
 
 sources :
     - https://www.tecmint.com/check-linux-cpu-information/
+    - https://www.javatpoint.com/linux-top
+    - https://www.geeksforgeeks.org/top-command-in-linux-with-examples/
 
 
 """
