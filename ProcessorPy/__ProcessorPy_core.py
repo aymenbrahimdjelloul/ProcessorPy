@@ -5,12 +5,15 @@ date : 04.08.2023
 license : MIT
 
 """
+
 # IMPORTS
 import sys
 import csv
 import os
+import platform
 from math import ceil
 from multiprocessing import cpu_count
+from datetime import datetime
 
 __version__ = "0.0.1"
 
@@ -101,6 +104,7 @@ class ProcessorPyCore:
     def get_cpu_info(self) -> dict:
         """ This method will return all cpu information in a dit"""
         return {
+            "operating_system": platform.freedesktop_os_release()["PRETTY_NAME"],
             "cpu_name": self.__processor_object.name,
             "manufacturer": self.__processor_object.manufacturer,
             "arch": self.__processor_object.architecture,
@@ -115,7 +119,8 @@ class ProcessorPyCore:
             # "is_turbo_boosted": self.__processor_object.is_turbo_boosted(),
             "is_support_virtualization": self.__processor_object.is_support_virtualization(),
             "cpu_cores": self.__processor_object.core_count(),
-            "cpu_threads": self.__processor_object.core_count(logical=True)
+            "cpu_threads": self.__processor_object.core_count(logical=True),
+            "report_date": datetime.now().strftime("%d/%m/%Y %H:%M")
         }
 
     @property
