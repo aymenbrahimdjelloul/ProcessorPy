@@ -41,6 +41,9 @@ my_cpu = Processor()
 # Print out your CPU Name !
 print(my_cpu.name)
 
+# Determine if your CPU support hypervisor or virtualization technology
+print(my_cpu.is_support_virtualization())
+
 ~~~
 
 Sensors Usage
