@@ -1,3 +1,7 @@
+# Author: Aymen Brahim Djelloul
+# Date : 13.08.2023
+# This code will test ProcessorPy if it's work properly without any issues or missed info on diffrent platforms
+
 from processor_py import ProcessorPy
 import platform
 
