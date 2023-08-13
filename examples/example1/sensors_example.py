@@ -9,8 +9,15 @@ from ProcessorPy import Sensors
 sense = Sensors()
 
 def main():
-    pass
 
+    # Get the current reading of CPU clock speed in Mhz
+    print(sense.get_cpu_clock_speed())
+
+    # Get the current CPU usage percentage with the usage percent of each core separatly
+    print(sense.get_cpu_usage(per_core=True))
+
+    # Get the available CPU voltage in friendly string or in integer
+    print(sense.get_voltage(friendly_format=True))
 
 
 if __name__ == "__main__":
