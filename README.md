@@ -7,13 +7,13 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 
 <h2>Features</h2>
 
--[x] Cross platform (ProcessorPy support both of Windows and Linux systems)
+- [x] Cross platform (ProcessorPy support both of Windows and Linux systems)
 
--[x] Easy & Fast !
+- [x] Easy & Fast !
 
--[x] Provide accurate inforamtions
+- [x] Provide accurate inforamtions
 
--[x] Pure python (No need for external dependencies)
+- [x] Pure python (No need for external dependencies)
 
 <h2>How It's Work ?</h2>
 <p1>ProcessorPy do it perfect job by using multiple methods and system built-in tools in both Windows and Linux-Debian systems,
