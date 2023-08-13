@@ -7,6 +7,8 @@ license : MIT
 
 
 sources :
+    https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-counter?view=powershell-7.3
+    https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-processor
     https://community.spiceworks.com/how_to/170332-how-to-get-cpu-information-in-windows-powershell
     https://xkln.net/blog/analyzing-cpu-usage-with-powershell-wmi-and-excel/
 
