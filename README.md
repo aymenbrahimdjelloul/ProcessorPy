@@ -1,6 +1,6 @@
 <!-- GitHub README.md -->
 
-<h1>ProcessorPy</h1>
+<h1 align="center">ProcessorPy</h1>
 
 <p>ProcessorPy is a Cross-platform, Pure python Library that's will get CPU information's & specifications also it's provide a sensors readings.
 ProcessorPy should do it without any external dependecies or any kind of C/C++ or Assembly scripts, It's piece of a pure-python work for both Windows and Linux-debian systems</p>
