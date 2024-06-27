@@ -4,6 +4,7 @@
 
 from processor_py import ProcessorPy
 import platform
+import sys
 
 my_cpu = ProcessorPy.Processor()
 sensors = ProcessorPy.Sensors()
@@ -30,11 +31,17 @@ def processor_py_test():
 
     return True
 
+if __name__ == "__main__":
+    if processor_py_test():
+        print(f"ProcessorPy is working properly on {platform.freedesktop_os_release()['PRETTY_NAME']} \n"
+              f"with {my_cpu.name} CPU ")
+    
+    else:
+        print(f"ProcessorPy Failed to run properly on {platform.freedesktop_os_release()['PRETTY_NAME']}\n"
+              f"with {my_cpu.name} CPU")
 
-if processor_py_test():
-    print(f"ProcessorPy is working properly on {platform.freedesktop_os_release()['PRETTY_NAME']} \n"
-          f"with {my_cpu.name} CPU ")
-
-else:
-    print(f"ProcessorPy Failed to run properly on {platform.freedesktop_os_release()['PRETTY_NAME']}\n"
-          f"with {my_cpu.name} CPU")
+    # To prevent exiting directly
+    input()
+    
+    # exit
+    sys.exit()
