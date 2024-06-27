@@ -33,6 +33,7 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 | Ubuntu 20.04 LTS | AMD Ryzen 3 3200G | YES |
 | Ubuntu 23.04 | AMD Ryzen 3 3200G | YES |
 | Ubuntu 24.04 LTS | AMD Ryzen 3 3200G | YES |
+| Linux Mint 21.3 | AMD Ryzen 3 3200G | YES |
 
 
 Simple Usage
