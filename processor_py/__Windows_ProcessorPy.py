@@ -1,7 +1,7 @@
 """
 
 @author : Aymen Brahim Djelloul
-version : 0.0.1
+version : 1.0
 date : 04.08.2023
 license : MIT
 
@@ -84,7 +84,7 @@ class Processor(ProcessorPyCore):
         """ This method will return the maximum cpu clock speed"""
 
         return int(self.__get_win32_procesor_info("MaxClockSpeed")) if not friendly_format else \
-            f'{self.ProcessorPyCore__megahertz_to_gigahertz(int(self.__get_win32_procesor_info("MaxClockSpeed")))} Mb'
+            f'{self._ProcessorPyCore__megahertz_to_gigahertz(int(self.__get_win32_procesor_info("MaxClockSpeed")))} Ghz'
 
     # def is_turbo_boosted(self) -> bool | None:
     #     """ This method will determine if the cpu is turbo boosted feature"""
@@ -114,7 +114,7 @@ class Sensors(ProcessorPyCore):
     __max_clock_speed: int
 
     def __init__(self):
-        super(Sensors, self).__init__()
+        super(Sensors, self).__init__(Processor)
 
         # Get powershell path
         self.__powershell_path = "C:\\Windows\\System32\\WindowsPowershell\\v1.0\\powershell.exe"

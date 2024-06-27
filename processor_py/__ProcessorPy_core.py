@@ -1,6 +1,6 @@
 """
 @author: Aymen Brahim Djelloul
-version : 0.0.1
+version : 1.0
 date : 04.08.2023
 license : MIT
 
@@ -15,7 +15,7 @@ from math import ceil
 from multiprocessing import cpu_count
 from datetime import datetime
 
-__version__ = "0.0.1"
+__version__ = "1.0"
 
 
 class ProcessorPyCore:
@@ -104,13 +104,13 @@ class ProcessorPyCore:
     def get_cpu_info(self) -> dict:
         """ This method will return all cpu information in a dit"""
         return {
-            "operating_system": platform.freedesktop_os_release()["PRETTY_NAME"],
+            # "operating_system": platform.freedesktop_os_release()["PRETTY_NAME"],
             "cpu_name": self.__processor_object.name,
             "manufacturer": self.__processor_object.manufacturer,
             "arch": self.__processor_object.architecture,
             "family": self.__processor_object.family,
-            "model": self.__processor_object.model,
-            "stepping": self.__processor_object.stepping,
+            # "model": self.__processor_object.model,
+            "stepping": self.__processor_object.stepping(),
             "flags": self.__processor_object.flags,
             "l1_cache_size": self.__processor_object.l1_cache_size(),
             "l2_cache_size": self.__processor_object.l2_cache_size(),
@@ -122,6 +122,7 @@ class ProcessorPyCore:
             "cpu_threads": self.__processor_object.core_count(logical=True),
             "report_date": datetime.now().strftime("%d/%m/%Y %H:%M")
         }
+
 
     @property
     def version_string(self) -> str:

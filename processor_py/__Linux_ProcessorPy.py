@@ -1,6 +1,6 @@
 """
 @author : Aymen Brahim Djelloul
-version : 0.0.1
+version : 1.0
 date : 05.08.2023
 license : MIT
 
@@ -60,12 +60,11 @@ class Processor(ProcessorPyCore):
         """ This method will return the cpu family value"""
         return self.__get_text_info(r"CPU family:")
 
-    @property
-    def model(self) -> str | None:
-        """ This method will return the cpu model value"""
-        return self.__get_text_info(r"Model:")
+    # @property
+    # def model(self) -> str | None:
+    #     """ This method will return the cpu model value"""
+    #     return self.__get_text_info(r"Model:")
 
-    @property
     def stepping(self) -> str | None:
         """ This method will return the cpu stepping value"""
         return self.__get_text_info(r"Stepping:")

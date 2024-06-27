@@ -1,6 +1,6 @@
 """
 @authors : Aymen Brahim Djelloul
-version : 0.0.1
+version : 1.0
 date : 04.08.2023
 License : MIT
 
@@ -10,9 +10,8 @@ License : MIT
 
 """
 
-# IMPORTS
 from platform import system
-from exceptions import NotSupportedPlatform
+from exceptions import *
 
 
 if __name__ != "__main__":
