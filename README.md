@@ -27,6 +27,7 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 
 | OS      | CPU Platform |  Worked Succefully  |
 |-----------|---------------|-------------------|
+| Windows 10 | Intel Core i7-7600U 2.80 GHz | YES |
 | Widnwows 11 Pro  | AMD Ryzen 3 3200G | YES |
 | Windows 10 Pro | AMD Ryzen 3 3200G | YES |
 | Ubuntu 20.04 LTS | AMD Ryzen 3 3200G | YES |
