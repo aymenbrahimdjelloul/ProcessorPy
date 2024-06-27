@@ -9,6 +9,8 @@ ProcessorPy should do it without any external dependecies or any kind of C/C++ o
 
 - [x] Cross platform (ProcessorPy support both of Windows and Linux systems)
 
+- [x] Available with user-friendly Graphical user interface 
+
 - [x] Easy & Fast !
 
 - [x] Provide accurate inforamtions
