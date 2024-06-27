@@ -98,7 +98,23 @@ class Processor(ProcessorPyCore):
 
     def max_clock_speed(self) -> str | None:
         """ This method will return the maximum cpu clock speed"""
-        return self.__get_text_info(r"CPU MHz:")
+
+        if self.__get_text_info(r"CPU MHz:") is None:
+
+            try:
+                # Execute the command and get the output
+                output = subprocess.check_output("cat /proc/cpuinfo | grep 'cpu MHz'", shell=True, text=True)
+                
+                # Extract the maximum clock speed from the output
+                max_speed = 0.0
+                for line in output.split('\n'):
+                    if "cpu MHz" in line:
+                        speed = float(line.split(':')[-1].strip())
+                        if speed > max_speed:
+                            max_speed = speed
+                return max_speed if max_speed > 0 else None
+            except subprocess.CalledProcessError as e:
+                return None
 
     # def is_turbo_boosted(self) -> bool | None:
     #     """ This method will determine if the cpu is turbo boosted feature"""
