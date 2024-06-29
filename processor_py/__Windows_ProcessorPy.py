@@ -110,7 +110,9 @@ class Processor(ProcessorPyCore):
         return ' '.join(_process_output).strip('-') if len(_process_output) > 1 else None
 
 
+
 class Sensors(ProcessorPyCore):
+    
     __max_clock_speed: int
 
     def __init__(self):
@@ -136,24 +138,25 @@ class Sensors(ProcessorPyCore):
         # print(cpu_load_percentage * self.__max_clock_speed / 100.0)
         return round(cpu_load_percentage * self.__max_clock_speed / 100.0, 2)
 
-    def get_cpu_usage(self, per_core: bool = True) -> int | ProcessorPyResult | None:
+    def get_cpu_usage(self, per_core: bool = False) -> int | ProcessorPyResult | None:
         """ This method will return the current cpu load percentage"""
 
-        # Define cpu usage variable
-        cpu_usage: int | ProcessorPyResult = 0
-
-        # Get process output
-        _process_output = subprocess.check_output([self.__powershell_path, 'Get-CimInstance', '-Query', '"select',
-                                                   'Name,', 'PercentProcessorTime', 'from',
-                                                   'Win32_PerfFormattedData_PerfOS_Processor"', '|', 'Select',
-                                                   'Name,',
-                                                   'PercentProcessorTime'], text=True).replace('-', '').split()
-
-        # Remove unwanted items
-        _process_output.remove("Name")
-        _process_output.remove("PercentProcessorTime")
-
         if per_core:
+
+            # Define cpu usage variable
+            cpu_usage: int | ProcessorPyResult = 0
+
+            # Get process output
+            _process_output = subprocess.check_output([self.__powershell_path, 'Get-CimInstance', '-Query', '"select',
+                                                       'Name,', 'PercentProcessorTime', 'from',
+                                                       'Win32_PerfFormattedData_PerfOS_Processor"', '|', 'Select',
+                                                       'Name,',
+                                                       'PercentProcessorTime'], text=True).replace('-', '').split()
+
+            # Remove unwanted items
+            _process_output.remove("Name")
+            _process_output.remove("PercentProcessorTime")
+
             # THIS SECTION WILL GET THE CPU USAGE PERCENTAGE FOR EACH CORE
 
             # Get cores usage percentage in tuple
@@ -178,16 +181,29 @@ class Sensors(ProcessorPyCore):
 
             # Clear memory
             del core_usage_percentage, value_gotten, _, _process_output
+            # return the result
+            return cpu_usage
 
         elif not per_core:
-            # THIS SECTION WILL GET THE TOTAL CPU USAGE
-            cpu_usage = int(_process_output[-1])
 
-            # Clear memory
-            del _process_output
+            # Take the initial reading
+            prev_idle, prev_total = self.__get_cpu_times()
 
-        # Return result
-        return cpu_usage
+            # Sleep for the specified interval
+            sleep(0.1)
+
+            # Take the second reading
+            idle, total = self.__get_cpu_times()
+
+            # Calculate the CPU usage
+            idle_delta = idle - prev_idle
+            total_delta = total - prev_total
+
+            if total_delta == 0:
+                return 0
+
+            cpu_usage = int(100 * (1 - (idle_delta / total_delta)))
+            return cpu_usage
 
     def get_cpu_voltage(self, friendly_format: bool = True) -> int | str | None:
         """ This method will return the cpu voltage value"""
@@ -211,6 +227,21 @@ class Sensors(ProcessorPyCore):
         """ This method will return the cpu max clock speed"""
         self.__max_clock_speed = int(subprocess.check_output(["WMIC", "CPU", "GET", "MaxClockSpeed"],
                                                              text=True).split()[-1])
+
+    @staticmethod
+    def __get_cpu_times():
+        idle_time = ctypes.c_ulonglong()
+        kernel_time = ctypes.c_ulonglong()
+        user_time = ctypes.c_ulonglong()
+
+        if not ctypes.windll.kernel32.GetSystemTimes(
+                ctypes.byref(idle_time),
+                ctypes.byref(kernel_time),
+                ctypes.byref(user_time)
+        ):
+            raise Exception("Failed to get system times")
+
+        return idle_time.value, kernel_time.value + user_time.value
 
 
 if __name__ == "__main__":
