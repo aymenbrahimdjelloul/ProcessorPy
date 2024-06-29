@@ -83,9 +83,20 @@ class Processor(ProcessorPyCore):
     def max_clock_speed(self, friendly_format: bool = True) -> str | int | None:
         """ This method will return the maximum cpu clock speed"""
 
-        return int(self.__get_win32_procesor_info("MaxClockSpeed")) if not friendly_format else \
-            f'{self._ProcessorPyCore__megahertz_to_gigahertz(int(self.__get_win32_procesor_info("MaxClockSpeed")))} Ghz'
+        try:
+            # Run the command to get CPU information
+            output = subprocess.check_output("wmic cpu get CurrentClockSpeed /value", shell=True).decode()
 
+            # Process the output to extract the clock speed value
+            for line in output.splitlines():
+
+                if line.startswith("CurrentClockSpeed"):
+                    # Extract the value after the '=' sign
+                    return int(line.split('=')[1].strip()) if not friendly_format else \
+                        f'{self._ProcessorPyCore__megahertz_to_gigahertz(int(line.split('=')[1].strip()))} Ghz'
+
+        except subprocess.SubprocessError:
+            return None
     # def is_turbo_boosted(self) -> bool | None:
     #     """ This method will determine if the cpu is turbo boosted feature"""
 
