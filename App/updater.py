@@ -1,6 +1,6 @@
 """
 @author : Aymen Brahim Djelloul
-version : 1.0.0
+version : 1.0.1
 date : 10.07.2024
 License : MIT
 
@@ -31,7 +31,7 @@ import os
 import requests
 import zipfile
 import subprocess
-
+from time import sleep
 
 def _is_process_running(process_name: str = "ProcessorPy") -> bool:
     """
@@ -70,11 +70,7 @@ class Updater:
 
         # Download the update data
         print("Downloading..")  # For Debugging
-        self.download_update(self.download_link, os.getcwd())
-
-        # Extract the downloaded data
-        print("unzip..")   # For Debugging
-        self.__extract_data("data.zip")
+        # self.download_update(self.download_link, os.getcwd())
 
         # Kill the previous ProcessorPy App
         self.__kill_processor_py_process()
@@ -83,6 +79,13 @@ class Updater:
         if _is_process_running():
             # retry to kill it cause sometimes it will not dead from the first execution
             self.__kill_processor_py_process()
+
+        # Wait a half second to give ProcessorPy process time to end
+        sleep(0.5)
+
+        # Extract the downloaded data
+        print("unzip..")   # For Debugging
+        self.__extract_data("data.zip", os.getcwd())
 
         # Restart the App
         self.__restart_processor_py()
@@ -110,7 +113,7 @@ class Updater:
         del r, f, chunk
 
     @staticmethod
-    def __extract_data( zip_path: str):
+    def __extract_data(zip_path: str, extract_to: str):
         """
         Extracts the contents of a ZIP file to a specified location.
 
@@ -123,25 +126,20 @@ class Updater:
         zipfile.BadZipFile: If the file is not a valid ZIP file.
         PermissionError: If there are permission issues accessing the file or directory.
         """
-        try:
 
-            # Open the ZIP file
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # Extract all contents to the specified location
-                zip_ref.extractall(extract_to)
-            print(f"Successfully extracted '{zip_path}' to '{extract_to}'")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_to)
+        print(f"Extracted all contents of {zip_path} to {extract_to}")
 
-            # Clear memory
-            del zip_ref, zip_path
-
-        except FileNotFoundError as fnf_error:
-            print(fnf_error)
-        except zipfile.BadZipFile:
-            print(f"The file '{zip_path}' is not a valid ZIP file.")
-        except PermissionError as perm_error:
-            print(f"Permission error: {perm_error}")
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+        # except FileNotFoundError as fnf_error:
+        #     print(fnf_error)
+        # except zipfile.BadZipFile:
+        #     print(f"The file '{zip_path}' is not a valid ZIP file.")
+        # except PermissionError as perm_error:
+        #     print(f"Permission error: {perm_error}")
+        # except Exception as e:
+        #     # print(f"An unexpected error occurred: {e}")
+        #     pass
 
     @staticmethod
     def __kill_processor_py_process(process_name: str = "ProcessorPy.exe") -> int:
