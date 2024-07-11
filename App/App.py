@@ -596,7 +596,6 @@ class Updater(QWidget):
 
         # Store request data
         self.REQUEST_DATA = r
-        latest_release = "1.1"
 
         return True if current_version == latest_release else False
 
