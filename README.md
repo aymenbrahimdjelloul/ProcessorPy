@@ -6,7 +6,7 @@
 ProcessorPy should do it without any external dependecies or any kind of C/C++ or Assembly scripts, It's piece of a pure-python work for both Windows and Linux-debian systems</p>
 
 ![Application Screenshot](https://github.com/aymenbrahimdjelloul/ProcessorPy/blob/main/screenshots/ProcessorPy_1.PNG)
-
+![Application Screenshot](https://github.com/aymenbrahimdjelloul/ProcessorPy/blob/main/screenshots/ProcessorPy_2.PNG)
 
 <h2>Features</h2>
 
