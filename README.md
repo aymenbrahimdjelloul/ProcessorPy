@@ -2,8 +2,11 @@
 
 <h1 align="center">ProcessorPy</h1>
 
-[![Download](https://img.shields.io/badge/Download-TicTacToe-brightgreen)](https://github.com/aymenbrahimdjelloul/ProcessorPy/releases/download/v1.0.2/ProcessorPy.zip)
-
+<div align="center">
+  <a href="https://github.com/aymenbrahimdjelloul/ProcessorPy/releases/download/v1.0.2/ProcessorPy.zip">
+    <img src="https://img.shields.io/badge/Download-TicTacToe-brightgreen" alt="Download">
+  </a>
+</div>
 
 <p>ProcessorPy is a Cross-platform, Pure python Library that's will get CPU information's & specifications also it's provide a sensors readings.
 ProcessorPy should do it without any external dependecies or any kind of C/C++ or Assembly scripts, It's piece of a pure-python work for both Windows and Linux-debian systems</p>
