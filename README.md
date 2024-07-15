@@ -4,7 +4,7 @@
 
 <div align="center">
   <a href="https://github.com/aymenbrahimdjelloul/ProcessorPy/releases/download/v1.0.2/ProcessorPy.zip">
-    <img src="https://img.shields.io/badge/Download-TicTacToe-brightgreen" alt="Download">
+    <img src="https://img.shields.io/badge/Download-ProcessorPy-brightgreen" alt="Download">
   </a>
 </div>
 
