@@ -36,6 +36,7 @@ ProcessorPy should do it without any external dependecies, It's piece of a pure-
 
 | OS      | CPU Platform |  Worked Succefully  |
 |-----------|---------------|-------------------|
+| Windows 10 | Intel Core i5-7Y54 1.20 Ghz | YES |
 | Windows 10 | Intel Core i7-7600U 2.80 GHz | YES |
 | Widnwows 11 Pro  | AMD Ryzen 3 3200G | YES |
 | Windows 10 Pro | AMD Ryzen 3 3200G | YES |
