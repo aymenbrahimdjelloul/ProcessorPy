@@ -1,8 +1,8 @@
 <!-- GitHub README.md -->
 
-<h1 align="center">ProcessorPy</h1>
+<h1>ProcessorPy</h1>
 
-<div align="center">
+<div>
   <a href="https://github.com/aymenbrahimdjelloul/ProcessorPy/releases/download/v1.0.2/ProcessorPy.zip">
     <img src="https://img.shields.io/badge/Download-ProcessorPy-brightgreen" alt="Download">
   </a>
