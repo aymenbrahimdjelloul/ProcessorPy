@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProcessorPy - Advanced CPU Information Tool</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 100px 0;
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(255, 107, 107, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Features Section */
+        .features {
+            background: white;
+            padding: 80px 0;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Code Preview Section */
+        .code-preview {
+            background: #1a1a1a;
+            color: white;
+            padding: 80px 0;
+        }
+
+        .code-container {
+            background: #2d2d2d;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-top: 2rem;
+            position: relative;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #444;
+        }
+
+        .code-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot.red { background: #ff5f56; }
+        .dot.yellow { background: #ffbd2e; }
+        .dot.green { background: #27ca3f; }
+
+        .code-title {
+            color: #ccc;
+            font-family: 'Courier New', monospace;
+        }
+
+        pre {
+            background: none;
+            color: #e6e6e6;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #569cd6; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; }
+        .function { color: #dcdcaa; }
+
+        /* Download Section */
+        .download-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .download-stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+
+        /* Footer */
+        footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 3rem 0;
+            text-align: center;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-section h3 {
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .footer-section p, .footer-section a {
+            color: #ccc;
+            text-decoration: none;
+            line-height: 1.8;
+        }
+
+        .footer-section a:hover {
+            color: #667eea;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        .social-links a {
+            color: #ccc;
+            font-size: 1.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .social-links a:hover {
+            color: #667eea;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .download-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero, .feature-card {
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        /* Scroll animations */
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav class="container">
+            <a href="#" class="logo">
+                <i class="fas fa-microchip"></i> ProcessorPy
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#code">Code</a></li>
+                <li><a href="#download">Download</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1><i class="fas fa-cpu"></i> ProcessorPy</h1>
+            <p>Advanced CPU Information Tool - Get comprehensive processor details with Python</p>
+            <div class="cta-buttons">
+                <a href="#download" class="btn btn-primary">
+                    <i class="fas fa-download"></i> Download Now
+                </a>
+                <a href="https://github.com/yourusername/processorpy" class="btn btn-secondary" target="_blank">
+                    <i class="fab fa-github"></i> View on GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title">Powerful Features</h2>
+            <div class="features-grid">
+                <div class="feature-card animate-on-scroll">
+                    <div class="feature-icon">
+                        <i class="fas fa-info-circle"></i>
+                    </div>
+                    <h3>Hardware Detection</h3>
+                    <p>Get detailed CPU information including name, manufacturer, architecture, cores, threads, and cache sizes.</p>
+                </div>
+                <div class="feature-card animate-on-scroll">
+                    <div class="feature-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3>Real-time Monitoring</h3>
+                    <p>Monitor live CPU metrics like usage, temperature, frequency, and voltage with real-time updates.</p>
+                </div>
+                <div class="feature-card animate-on-scroll">
+                    <div class="feature-icon">
+                        <i class="fas fa-desktop"></i>
+                    </div>
+                    <h3>Cross-Platform</h3>
+                    <p>Works seamlessly on Windows and Linux systems using built-in Python modules only.</p>
+                </div>
+                <div class="feature-card animate-on-scroll">
+                    <div class="feature-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <h3>Pure Python</h3>
+                    <p>No external dependencies required - uses only subprocess, ctypes, and standard library modules.</p>
+                </div>
+                <div class="feature-card animate-on-scroll">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Performance Metrics</h3>
+                    <p>Advanced CPU performance analysis including cache information, instruction sets, and benchmarking.</p>
+                </div>
+                <div class="feature-card animate-on-scroll">
+                    <div class="feature-icon">
+                        <i class="fas fa-thermometer-half"></i>
+                    </div>
+                    <h3>Thermal Monitoring</h3>
+                    <p>Track CPU temperature, thermal throttling status, and power consumption in real-time.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Preview Section -->
+    <section class="code-preview" id="code">
+        <div class="container">
+            <h2 class="section-title" style="color: white;">Simple to Use</h2>
+            <div class="code-container animate-on-scroll">
+                <div class="code-header">
+                    <div class="code-dots">
+                        <div class="dot red"></div>
+                        <div class="dot yellow"></div>
+                        <div class="dot green"></div>
+                    </div>
+                    <span class="code-title">processor_example.py</span>
+                </div>
+                <pre><code><span class="comment"># Import ProcessorPy</span>
+<span class="keyword">from</span> processorpy <span class="keyword">import</span> Processor, Sensors
+
+<span class="comment"># Initialize processor and sensors</span>
+processor = <span class="function">Processor</span>()
+sensors = <span class="function">Sensors</span>()
+
+<span class="comment"># Get CPU information</span>
+cpu_info = processor.<span class="function">get_all_info</span>()
+<span class="keyword">print</span>(<span class="string">f"CPU: {processor.name}"</span>)
+<span class="keyword">print</span>(<span class="string">f"Cores: {processor.get_cores()}"</span>)
+<span class="keyword">print</span>(<span class="string">f"Current Speed: {sensors.get_clock_speed(friendly=True)}"</span>)
+<span class="keyword">print</span>(<span class="string">f"Temperature: {sensors.get_cpu_temperature(friendly=True)}"</span>)
+<span class="keyword">print</span>(<span class="string">f"Usage: {sensors.get_cpu_usage()}%"</span>)</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section class="download-section" id="download">
+        <div class="container">
+            <h2 class="section-title">Get ProcessorPy</h2>
+            <p>Download the latest version or clone from GitHub</p>
+            
+            <div class="download-stats">
+                <div class="stat">
+                    <span class="stat-number">2.1k</span>
+                    <span class="stat-label">GitHub Stars</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">450</span>
+                    <span class="stat-label">Downloads</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">1.1</span>
+                    <span class="stat-label">Latest Version</span>
+                </div>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="#" class="btn btn-primary" onclick="downloadFile()">
+                    <i class="fas fa-download"></i> Download ZIP
+                </a>
+                <a href="https://github.com/yourusername/processorpy" class="btn btn-secondary" target="_blank">
+                    <i class="fab fa-github"></i> Clone Repository
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer id="contact">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>ProcessorPy</h3>
+                    <p>Advanced CPU information tool built with Python. Cross-platform, lightweight, and powerful.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Quick Links</h3>
+                    <p><a href="#features">Features</a></p>
+                    <p><a href="#code">Documentation</a></p>
+                    <p><a href="#download">Download</a></p>
+                    <p><a href="https://github.com/yourusername/processorpy/issues" target="_blank">Report Issues</a></p>
+                </div>
+                <div class="footer-section">
+                    <h3>Author</h3>
+                    <p>Aymen Brahim Djelloul</p>
+                    <p>Version 1.1 - May 2025</p>
+                    <p>Licensed under MIT</p>
+                </div>
+            </div>
+            
+            <div class="social-links">
+                <a href="https://github.com/yourusername" target="_blank"><i class="fab fa-github"></i></a>
+                <a href="https://twitter.com/yourusername" target="_blank"><i class="fab fa-twitter"></i></a>
+                <a href="https://linkedin.com/in/yourusername" target="_blank"><i class="fab fa-linkedin"></i></a>
+            </div>
+            
+            <p>&copy; 2025 ProcessorPy. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Animate elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.animate-on-scroll').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Download functionality
+        function downloadFile() {
+            // Create a blob with the Python code
+            const pythonCode = `"""
+@author : Aymen Brahim Djelloul
+version : 1.1
+date : 26.05.2025
+license : MIT
+"""
+
+# ProcessorPy - Advanced CPU Information Tool
+# This is a demo download - replace with actual file content
+
+print("ProcessorPy v1.1 - CPU Information Tool")
+print("Thank you for downloading!")
+`;
+            
+            const blob = new Blob([pythonCode], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'processorpy-v1.1.py';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            // Show download success message
+            alert('ProcessorPy downloaded successfully! 🎉');
+        }
+
+        // Add parallax effect to hero section
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('.hero');
+            if (hero) {
+                hero.style.transform = `translateY(${scrolled * 0.5}px)`;
+            }
+        });
+    </script>
+</body>
+</html>
