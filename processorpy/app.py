@@ -15,14 +15,12 @@ license : MIT
 # IMPORTS
 import os
 import sys
-import requests
-import subprocess
-from time import sleep
 from datetime import datetime
 from typing import Optional, Dict
 from dataclasses import dataclass
 from processorpy import Processor, Sensors
 from webbrowser import open as open_url
+from ._utils import Updater, ProcessorPyResult
 
 from PyQt5.QtGui import QFont, QFontDatabase
 from PyQt5.Qt import (QApplication, QWidget, QSize, QThread, pyqtSignal, QLabel, QMessageBox,
@@ -208,7 +206,7 @@ class InfoDisplayWidget(QWidget):
     def add_info_item(self, key: str, value: str, x: int = 10, y: int = None, font: QFont = None) -> None:
         """Add an information item using absolute positioning"""
 
-        formatted_text: str = f"{key} : {value}"
+        formatted_text: str = f"{key} 1: {value}"
         label = QLabel(formatted_text, self)
         label.setStyleSheet(StyleManager.get_info_label_style())
         if font:
@@ -334,7 +332,7 @@ class App(QWidget):
         # Initialize about widget
         self.about_widget = About()
         # Initialize updater widget
-        self.updater = Updater()
+        self.updater = UpdateWidget()
         self.thread = None
         self.worker = None
 
@@ -467,7 +465,8 @@ class App(QWidget):
         self.cpu_info = cpu_info
 
         # Update CPU name button
-        self.cpu_name_button.setText(cpu_info.get("name", "Unknown CPU"))
+        name: str = cpu_info.get("name", "Unknown CPU").string
+        self.cpu_name_button.setText(name)
         # Remove name from cpu name dict
         self.cpu_info.pop("name")
 
@@ -660,11 +659,12 @@ class App(QWidget):
             self.move(self.pos() + delta)
             self.drag_start_position = event.globalPos()
 
-    def closeEvent(self, event) -> None:
+    def closeEvent(self) -> None:
         """Clean up when closing"""
-
+        # Stop sensor timer
         self.sensors_timer.stop()
-        event.accept()
+        # exit the application
+        sys.exit(0)
 
 
 class Worker(QThread):
@@ -683,6 +683,42 @@ class Worker(QThread):
         cpu_info: dict = self.cpu_obj.get_all_info()
         # emit result
         self.result_ready.emit(cpu_info)
+
+
+class MoreWidget(QLabel):
+
+    style: str = """
+    QLabel {
+        border: 1px solid;
+        border-radius: 7px;
+        background-color: #ebe8ed;
+        border-color: #ebe8ed;
+    }
+    
+    """
+    
+    def __init__(self) -> None:
+        super(MoreWidget, self).__init__(parent=None)
+
+        self.old_pos = None
+
+        # Setup widget
+        self.setStyleSheet(self.style)
+        self.setFixedSize(QSize(800, 500))
+        self.setWindowFlags(Qt.FramelessWindowHint)
+
+    def mousePressEvent(self, event) -> None:
+        """ This method will capture the mouse press event"""
+        self.old_pos = event.globalPos()
+
+    def mouseMoveEvent(self, event) -> None:
+        """ This method will capture the mouse move event"""
+        try:
+            delta = QPoint(event.globalPos() - self.old_pos)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.old_pos = event.globalPos()
+        except TypeError:
+            pass
 
 
 class About(QLabel):
@@ -835,16 +871,13 @@ class About(QLabel):
             pass
 
 
-class Updater(QWidget):
+class UpdateWidget(QWidget):
 
     """
     This Updater class contain the widget and logic for
     checking and install updates for ProcessorPy software
 
      """
-
-    # Store the request json data
-    is_up_to_date: bool = None
 
     style: str = """
     QLabel {
@@ -869,30 +902,45 @@ class Updater(QWidget):
     """
 
     def __init__(self) -> None:
-        super(Updater, self).__init__(parent=None)
+        super(UpdateWidget, self).__init__(parent=None)
+
+        # Create updater object
+        _updater = Updater(__version__)
+        _update_data = _updater.latest_data
+
+        # First check if new update available
+        if not _updater.is_update:
+            self.hide()
 
         # Set up the Updater window
         self.REQUEST_DATA: None | dict = None
         self.setFixedSize(QSize(500, 120))
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setStyleSheet("background-color: #DCDDDD;")
-
         self.old_pos: int | None = None
 
-        try:
-            # Check the latest release version
-            if self.is_update():
-                # If the App is Up-to-date kill it
-                self.hide()
-                self.deleteLater()
+        self.update_label = QLabel(self)
+        self.update_label.setFont(QFont("Ubuntu", 11))
+        self.update_label.move(10, 20)
+        self.update_label.setStyleSheet(self.style)
 
-            else:
-                # Otherwise ask the user to download latest version
-                self.setup_update()
+        # Create Cancel button
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.move(15, 80)
+        self.cancel_button.setStyleSheet(self.style)
+        self.cancel_button.setFont(QFont("Ubuntu", 11))
+        self.cancel_button.setCursor(Qt.PointingHandCursor)
+        self.cancel_button.clicked.connect(self._cancel)
 
-        except Exception:
-            self.hide()
-            self.deleteLater()
+        # Create Install now button
+        self.install_button = QPushButton("Install", self)
+        self.install_button.move(110, 80)
+        self.install_button.setStyleSheet(self.style)
+        self.install_button.setFont(QFont("Ubuntu", 10))
+        self.install_button.setCursor(Qt.PointingHandCursor)
+        self.install_button.clicked.connect(self._install)
+
+
 
     def mousePressEvent(self, event) -> None:
         """ This method will be called when a mouse button is pressed."""
@@ -908,163 +956,41 @@ class Updater(QWidget):
         except TypeError:
             pass
 
-    def is_update(self) -> bool | dict:
-        """Check for newer release version on GitHub."""
-
-        try:
-            response = requests.get(
-                url=_Const.updater_latest_version,
-                timeout=_Const.timeout
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            latest_version_str = data.get("tag_name", "")
-            latest_version = latest_version_str.strip("v")
-
-            self.REQUEST_DATA = data  # Save full release info
-
-            if VERSION < latest_version:
-                return {
-                    "update_available": True,
-                    "latest_version": str(latest_version),
-                    "current_version": str(_Const.version),
-                    "release_url": data.get("html_url", ""),
-                    "release_notes": data.get("body", ""),
-                }
-            else:
-                return False
-
-        except requests.RequestException as e:
-            print(f"Error checking for updates: {e}")
-            return False
-
-    def setup_update(self) -> None:
+    def _set_update(self) -> None:
         """ This method will set up the update widget"""
 
-        # Create Updater label
-        self.update_label = QLabel(f"New update available! Please download the latest version. {self.REQUEST_DATA['tag_name']}\n\n"
-                              f" Download size : {self.bytes_to_megabytes(self.REQUEST_DATA['assets'][0]['size'])} Mb", self)
-        self.update_label.setFont(QFont("Ubuntu", 11))
-        self.update_label.move(10, 20)
-        self.update_label.setStyleSheet(self.style)
+        # Set the new version update description
+        text: str = f"New update available! Please download the latest version. {self.REQUEST_DATA['tag_name']}\n\n"\
+                    f" Download size : {self.bytes_to_megabytes(self.REQUEST_DATA['assets'][0]['size'])} Mb"
 
-        # Create Cancel button
-        self.cancel_button = QPushButton("Cancel", self)
-        self.cancel_button.move(15, 80)
-        self.cancel_button.setStyleSheet(self.style)
-        self.cancel_button.setFont(QFont("Ubuntu", 11))
-        self.cancel_button.setCursor(Qt.PointingHandCursor)
-        self.cancel_button.clicked.connect(self.cancel_update)
+    def _install(self) -> None:
+        """ This method will direct use to download the latest version from website"""
 
-        # Create Install now button
-        self.install_button = QPushButton("Install Now", self)
-        self.install_button.move(110, 80)
-        self.install_button.setStyleSheet(self.style)
-        self.install_button.setFont(QFont("Ubuntu", 10))
-        self.install_button.setCursor(Qt.PointingHandCursor)
-        self.install_button.clicked.connect(self.update_app)
-
-        # Show Updater widget
-        self.show()
-
-    def cancel_update(self) -> None:
+    def _cancel(self) -> None:
         """ This method will cancel the whole update process"""
 
-        # First of all hide the update widget
+        # Hide updater widget
         self.hide()
+        # Kill it
+        self.deleteLater()
 
-        # Check if 'updater.exe' is running
-        if self.__is_process_running():
-            # Kill 'updater.exe' process
-            self.__kill_processor_py_process()
-            # Delete the downloaded data zip file
-            os.system("rm data.zip")
-
-    def update_app(self) -> None:
-        """ This method will download and install the new version """
-
-        # Hide install now button
-        self.install_button.hide()
-        # Change the label text
-        self.update_label.setText("Please wait..")
-        self.update_label.move(30, 20)
-
-        # Run the updater
-        os.startfile("updater.exe")
-
-    def update_finished(self) -> None:
-        """ This method called when the update is finished"""
-
-        # Set the finish label
-        self.update_label.setText(f"The {self.REQUEST_DATA['tag_name']} Update Installed succefully !"
-                                  f" Please restart the App.")
-        self.update_label.setStyleSheet("color: #308578;")
 
     @staticmethod
     def bytes_to_megabytes(num: int) -> int:
         """ This method will convert the given bytes to megabytes """
         return num // 1048576
 
-    @staticmethod
-    def __is_process_running(process_name: str = "updater") -> bool:
-        """
-        This function will detect if the 'ProcessorPy' process is running or not
 
-        :param: 'process_name'
-        :return: bool
-        """
+def __main__() -> None:
+    """ This method will start the app """
 
-        try:
-            # Run the 'tasklist' command to get the list of running processes
-            output = subprocess.check_output(['tasklist'], universal_newlines=True)
-            # Check if the process name is in the output
-            if process_name in output:
-                return True
-            else:
-                return False
-        except subprocess.CalledProcessError as e:
-            print(f"An error occurred: {e}")
-            return False
-
-    @staticmethod
-    def __kill_processor_py_process(process_name: str = "updater.exe") -> int:
-        """
-           This function will kill the specified process by name and return its PID.
-
-           :param process_name: Name of the process to kill.
-           :return: PID of the killed process if successful, -1 otherwise.
-           """
-
-        try:
-            # Find the PID of the process
-            result = subprocess.check_output(['tasklist', '/FI', f'IMAGENAME eq {process_name}'],
-                                             universal_newlines=True)
-
-            # Parse the output to get the PID
-            for line in result.splitlines():
-                if process_name in line:
-                    # Extract PID (assuming the PID is the second column in the output)
-                    pid = int(line.split()[1])
-
-                    # Kill the process using the PID
-                    subprocess.run(['taskkill', '/PID', str(pid), '/F'], check=True)
-                    print(f"Process {process_name} with PID {pid} has been killed.")  # For Debugging
-                    return pid
-
-            # If process name is not found in the output
-            print(f"Process {process_name} not found.")  # For Debugging
-            return -1
-
-        except subprocess.CalledProcessError as e:
-            print(f"An error occurred: {e}")  # For Debugging
-            return -1
-
-
-if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     _window = App()
     _window.show()
 
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    __main__()
