@@ -35,7 +35,7 @@ class _Const:
 
     # Define global constants
     author: str = "Aymen Brahim Djelloul"
-    version: str = "1.0"
+    version: str = "1.1"
     DATE: str = "27.05.2025"
     THIRD_PARTY: tuple = ("pyqt5", "requests")
     website_url: str = "https://aymenbrahimdjelloul.github.io/ProcessorPy"
@@ -201,12 +201,12 @@ class InfoDisplayWidget(QWidget):
         self.sensor_labels: dict = {}
         self.current_info_y: int = 10  # Starting Y position for CPU info
         self.current_sensor_y: int = 10  # Starting Y position for sensors
-        self.label_height: int = 35  # Height of each label including margin
+        self.label_height: int = 55  # Height of each label including margin
 
     def add_info_item(self, key: str, value: str, x: int = 10, y: int = None, font: QFont = None) -> None:
         """Add an information item using absolute positioning"""
 
-        formatted_text: str = f"{key} 1: {value}"
+        formatted_text: str = f"{key}  :  {value}"
         label = QLabel(formatted_text, self)
         label.setStyleSheet(StyleManager.get_info_label_style())
         if font:
@@ -218,8 +218,9 @@ class InfoDisplayWidget(QWidget):
             self.current_info_y += self.label_height
 
         label.move(x, y)
-        label.resize(200, 30)
+        label.resize(350, 50)
         label.show()
+
         self.info_labels[key] = label
         return label
 
@@ -256,7 +257,7 @@ class InfoDisplayWidget(QWidget):
             self.current_sensor_y += self.label_height
 
         label.move(x, y)
-        label.resize(200, 30)
+        label.resize(380, 30)
         label.show()
         self.sensor_labels[key] = label
         return label
@@ -288,6 +289,7 @@ class TitleBarWidget(QWidget):
                 icon_label.setPixmap(pixmap)
             except Exception:
                 icon_label.setText("📊")  # Fallback icon
+
             layout.addWidget(icon_label)
 
         # Title
@@ -324,6 +326,7 @@ class App(QWidget):
         super().__init__()
 
         # Initialize managers
+        self.icon_paths = None
         self.font_manager = FontManager()
         self.cpu_info: Optional[Dict] = None
         # Create Sensor object
@@ -357,17 +360,19 @@ class App(QWidget):
         """Initialize window properties"""
 
         self.setWindowTitle("ProcessorPy")
-        self.setFixedSize(QSize(450, 550))
+        self.setFixedSize(QSize(650, 800))
         self.setWindowFlags(Qt.FramelessWindowHint)
 
         # Try to set window icon
-        icon_paths: tuple = ("../Assets/icon.ico", "./Assets/icon.ico", "icon.ico")
-        for icon_path in icon_paths:
-            try:
+        self.icon_paths: tuple | str = ("../Assets/icon.ico", "./Assets/icon.ico", "icon.ico")
+        for icon_path in self.icon_paths:
+
+            if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
+                self.icon_paths = icon_path
+
                 break
-            except Exception:
-                continue
+
 
     def init_ui(self) -> None:
         """Initialize the user interface"""
@@ -377,7 +382,7 @@ class App(QWidget):
         main_layout.setSpacing(0)
 
         # Title bar
-        title_bar = TitleBarWidget("ProcessorPy", "../Assets/icon.ico", self.font_manager)
+        title_bar = TitleBarWidget("ProcessorPy", self.icon_paths, self.font_manager)
         title_bar.close_requested.connect(self.close)
         title_bar.minimize_requested.connect(self.showMinimized)
         main_layout.addWidget(title_bar)
@@ -659,7 +664,7 @@ class App(QWidget):
             self.move(self.pos() + delta)
             self.drag_start_position = event.globalPos()
 
-    def closeEvent(self) -> None:
+    def closeEvent(self, event) -> None:
         """Clean up when closing"""
         # Stop sensor timer
         self.sensors_timer.stop()
@@ -786,12 +791,12 @@ class About(QLabel):
 
         # set about widget
         self.setStyleSheet(self.style)
-        self.setFixedSize(QSize(350, 380))
+        self.setFixedSize(QSize(500, 550))
         self.setWindowFlags(Qt.FramelessWindowHint)
 
         # Create the exit button
         exit_button = QPushButton("X", self)
-        exit_button.move(315, 10)
+        exit_button.move(self.width() - 30, 10)
         exit_button.setObjectName("exit_button")
         exit_button.setCursor(Qt.PointingHandCursor)
         exit_button.setFont(QFont("Ubuntu", 12))
@@ -842,7 +847,7 @@ class About(QLabel):
         # contact me button
         self.contact_me_btn = QPushButton('Visit us', self)
         self.contact_me_btn.setObjectName('visitus')
-        self.contact_me_btn.move(100, 320)
+        self.contact_me_btn.move(100, self.height() - 30)
         self.contact_me_btn.setStyleSheet(self.style)
         self.contact_me_btn.setFont(QFont('Ubuntu', 11))
         self.contact_me_btn.setCursor(Qt.PointingHandCursor)
@@ -851,7 +856,7 @@ class About(QLabel):
         # GitHub repo button
         self.github_repo_btn = QPushButton('GitHub', self)
         self.github_repo_btn.setObjectName('githubBtn')
-        self.github_repo_btn.move(15, 320)
+        self.github_repo_btn.move(15, self.height() - 30)
         self.github_repo_btn.setStyleSheet(self.style)
         self.github_repo_btn.setFont(QFont('Ubuntu', 11))
         self.github_repo_btn.setCursor(Qt.PointingHandCursor)
@@ -905,7 +910,7 @@ class UpdateWidget(QWidget):
         super(UpdateWidget, self).__init__(parent=None)
 
         # Create updater object
-        _updater = Updater(__version__)
+        _updater = Updater(_Const.version)
         _update_data = _updater.latest_data
 
         # First check if new update available

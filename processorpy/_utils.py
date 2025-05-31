@@ -1,4 +1,9 @@
 """
+This code or file is part of 'ProcessorPy' project
+copyright (c) 2023-2025, Aymen Brahim Djelloul, All rights reserved.
+use of this source code is governed by MIT License that can be found on the project folder.
+
+
 @author : Aymen Brahim Djelloul
 version : 0.1
 date : 28.05.2025
@@ -15,12 +20,16 @@ import hashlib
 import requests
 import html
 from dataclasses import dataclass
+from typing import Union, Optional
 
 
 @dataclass
 class ProcessorPyResult:
-    string: str | int | float | bool
-    is_accurate: bool | None
+    """Holds a single data point extracted from CPU info, along with metadata."""
+
+    value: Union[str, int, float, bool]
+    is_accurate: Optional[bool]
+    method: Optional[str]
 
 
 class Const:
@@ -151,6 +160,9 @@ class CacheHandler:
         filename = f"{self.machine_id}_{timestamp}{Const.cache_ext}"
         self.cache_file_path = os.path.join(Const.cache_dir, filename)
 
+        # extract the string only from ProcessorPyResult returned class
+        data: dict = {k: v.string for k, v in data.items()}
+
         wrapped = {
             "timestamp": timestamp,
             "machine_id": self.machine_id,
@@ -188,6 +200,7 @@ class Updater:
 
         # Create requests session
         self.r_session = requests.Session()
+        self.latest_data: dict = None
 
     def is_update(self) -> bool:
         """ This method will check if there is new updates"""
