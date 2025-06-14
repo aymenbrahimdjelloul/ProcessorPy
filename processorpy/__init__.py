@@ -11,10 +11,8 @@ license : MIT
 
 """
 
-# IMPORTS
-import sys
+from processorpy._processor import Processor, ProcessorPyResult
+from processorpy._sensors import Sensors
 
-if sys.platform == 'win32':
-    from ._win_processor import Processor, Sensors
-else:
-    from ._linux_processor import Processor, Sensors
+
+__all__ = ['Processor', 'Sensors', 'ProcessorPyResult']
