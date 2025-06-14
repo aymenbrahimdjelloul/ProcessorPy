@@ -7,7 +7,7 @@ license : MIT License
 """
 
 # iIMPORTS
-from processorpy.cli import main
+from processorpy._cli import main
 
 
 if __name__ == '__main__':

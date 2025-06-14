@@ -7,7 +7,7 @@ license : MIT License
 """
 
 # IMPORT
-from processorpy.app import __main__
+from processorpy._interface import __main__
 
 
 if __name__ == "__main__":
