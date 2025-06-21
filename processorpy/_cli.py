@@ -1,495 +1,939 @@
+#!/usr/bin/env python3
 """
-This code or file is part of 'ProcessorPy' project
-copyright (c) 2023-2025, Aymen Brahim Djelloul, All rights reserved.
-use of this source code is governed by MIT License that can be found on the project folder.
-
-@author : Aymen Brahim Djelloul
-version : 0.1
-date : 29.05.2025
-license : MIT License
-
+ProcessorPy Interface - Advanced CPU Information and Sensor Monitoring Tool
+A sophisticated command-line interface for real-time CPU monitoring and reporting.
 """
 
-# !/usr/bin/env python3
-"""
-CPU Monitor CLI Application
-A comprehensive command-line tool for monitoring CPU information and sensors.
-"""
-
-import sys
+import re
 import os
-import time
+import sys
+import json
+import shutil
 import argparse
+import datetime
 import threading
-from typing import Dict, Any, Optional
-from datetime import datetime
+from time import sleep
+from typing import Any, Dict, List, Optional, Tuple
 
+# Handle missing imports
 try:
-    from processorpy import Processor, Sensors
-except ImportError:
-    print("Error: processorpy module not found. Please install it first.")
-    print("pip install processorpy")
+    from processorpy import Processor, Sensors, ProcessorPyException
+
+    # Use colorama for cross-platform coloring
+    from colorama import Fore, Style, init
+
+    # Initialize colorama
+    init(autoreset=True)
+
+
+    class Colors:
+        """A utility class that defines Interface coloring using 'colorama'"""
+        HEADER = Fore.CYAN + Style.BRIGHT
+        SUBHEADER = Fore.BLUE + Style.BRIGHT
+        SUCCESS = Fore.GREEN + Style.BRIGHT
+        WARNING = Fore.YELLOW + Style.BRIGHT
+        ERROR = Fore.RED + Style.BRIGHT
+        INFO = Fore.CYAN
+        HIGHLIGHT = Fore.MAGENTA + Style.BRIGHT
+        BOLD = Style.BRIGHT
+        DIM = Style.DIM
+        UNDERLINE = '\033[4m'
+        END = Style.RESET_ALL
+
+except ImportError as e:
+    print(f"Error importing required libraries: {e}")
+    print("Please install: pip install processorpy colorama")
+
+
+    # Fallback with traditional ANSI color codes
+    class Colors:
+        """Fallback ANSI color codes for basic terminal styling"""
+        HEADER = "\033[96m\033[1m"
+        SUBHEADER = "\033[94m\033[1m"
+        SUCCESS = "\033[92m\033[1m"
+        WARNING = "\033[93m\033[1m"
+        ERROR = "\033[91m\033[1m"
+        INFO = "\033[96m"
+        HIGHLIGHT = "\033[95m\033[1m"
+        BOLD = "\033[1m"
+        DIM = "\033[2m"
+        UNDERLINE = "\033[4m"
+        END = "\033[0m"
+
+except ProcessorPyException as e:
+    print(f"\n{Colors.ERROR}ProcessorPy cannot run properly: {e}{Colors.END}")
+    input("Press enter to exit...")
     sys.exit(1)
 
-try:
-    import colorama
-    from colorama import Fore, Back, Style
 
-    colorama.init(autoreset=True)
+class Config:
+    """Configuration constants for the ProcessorPy Interface application"""
 
+    APP_NAME: str = "ProcessorPy Interface"
+    VERSION: str = "1.1"
+    AUTHOR: str = "Aymen Brahim Djelloul"
+    WEBSITE: str = "https://github.com/aymenbrahimdjelloul/ProcessorPy"
+    DESCRIPTION: str = "Advanced CPU Information and Sensor Monitoring Tool"
 
-    class Colors:
-        RED = Fore.RED
-        GREEN = Fore.GREEN
-        YELLOW = Fore.YELLOW
-        BLUE = Fore.BLUE
-        MAGENTA = Fore.MAGENTA
-        CYAN = Fore.CYAN
-        WHITE = Fore.WHITE
-        BRIGHT = Style.BRIGHT
-        DIM = Style.DIM
-        RESET = Style.RESET_ALL
+    # Display configuration
+    MIN_TERMINAL_WIDTH: int = 80
+    DEFAULT_TERMINAL_WIDTH: int = 120
+    REPORT_WIDTH: int = 80
 
-except ImportError:
-    print("Warning: colorama not installed. Running without colors.")
-    print("Install with: pip install colorama")
+    # Timing configuration
+    DEFAULT_REFRESH_INTERVAL: int = 2
+    MIN_REFRESH_INTERVAL: int = 1
+    MAX_REFRESH_INTERVAL: int = 60
 
-
-    class Colors:
-        RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
-        BRIGHT = DIM = RESET = ""
-
-try:
-    import ctypes
-    import ctypes.wintypes
-
-    HAS_CTYPES = True
-except ImportError:
-    HAS_CTYPES = False
-
-
-def _run_as_admin() -> bool:
-    """Run the application as administrator on Windows"""
-    if os.name != 'nt' or not HAS_CTYPES:
-        return False
-
-    try:
-        is_admin = ctypes.windll.shell32.IsUserAnAdmin()
-        if not is_admin:
-            # Re-run the program with admin rights
-            ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", sys.executable, " ".join(sys.argv), None, 1
-            )
-            return True
-    except Exception as e:
-        print(f"Failed to run as administrator: {e}")
-        return False
-    return False
-
-
-class Const:
-    """Application constants"""
-    APP_NAME = "CPU Monitor"
-    APP_VERSION = "2.0.0"
-    APP_AUTHOR = "Enhanced CLI Tool"
-    UPDATE_INTERVAL = 1.0  # seconds
-    CONSOLE_WIDTH = 80
-
-    # Menu options
-    MENU_CPU_INFO = "1"
-    MENU_CPU_SENSORS = "2"
-    MENU_LIVE_MONITOR = "3"
-    MENU_HELP = "4"
-    MENU_ABOUT = "5"
-    MENU_EXIT = "q"
+    # File configuration
+    DEFAULT_OUTPUT_DIR: str = "cpu_reports"
+    SUPPORTED_FORMATS: tuple[str] = ("text", "json", "csv", "all")
 
 
 class Interface:
-    """Main interface class for the CPU monitoring application"""
+    """
+    Advanced interactive Interface tool for displaying and saving CPU information
+    and sensor readings with real-time monitoring capabilities.
+    """
 
     def __init__(self) -> None:
-        """Initialize the interface with processor and sensor objects"""
+        """Initialize the CPU monitoring interface"""
+
         try:
+            # Create Processor and Sensors objects
             self.processor = Processor()
             self.sensors = Sensors()
-            self.cpu_info: Dict[str, Any] = self.processor.get_all_info()
-            self.running = False
-            self.monitor_thread: Optional[threading.Thread] = None
 
-        except Exception as e:
-            print(f"{Colors.RED}Error initializing processor/sensors: {e}{Colors.RESET}")
+            # Get initial CPU info
+            self.cpu_info: dict[str] = self.processor.get_all_info()
+            self.sensor_data: dict[str] = {}
+
+        except ProcessorPyException as e:
+            print(f"{Colors.ERROR}Failed to initialize ProcessorPy: {e}{Colors.END}")
             sys.exit(1)
 
-    def _center_text(self, text: str, width: int = Const.CONSOLE_WIDTH) -> str:
-        """Center text within specified width"""
-        if len(text) >= width:
-            return text
-        padding = (width - len(text)) // 2
-        return " " * padding + text
+        # Parse command line arguments
+        self.args = self._parse_arguments()
 
-    def _handle_parameters(self) -> None:
-        """Handle command line parameters"""
+        # Application state
+        self.running = True
+        self.auto_refresh = False
+        self.refresh_thread = None
+
+        # Terminal configuration
+        self.terminal_width = self._get_terminal_width()
+
+        # Statistics tracking
+        self.start_time = datetime.datetime.now()
+        self.refresh_count = 0
+        self.last_update = None
+
+    @staticmethod
+    def _get_terminal_width() -> int:
+        """Get the current terminal width with fallback"""
+        try:
+            terminal_size = shutil.get_terminal_size()
+            width = terminal_size.columns
+            return max(width, Config.MIN_TERMINAL_WIDTH)
+        except (AttributeError, OSError):
+            return Config.DEFAULT_TERMINAL_WIDTH
+
+    @staticmethod
+    def _parse_arguments() -> argparse.Namespace:
+        """Parse and validate command line arguments"""
+
         parser = argparse.ArgumentParser(
-            description="CPU Monitor - Monitor your CPU information and sensors"
+            description=f"{Config.APP_NAME} - {Config.DESCRIPTION}",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=f"""
+Examples:
+  {sys.argv[0]} -i                          # Interactive mode
+  {sys.argv[0]} -s -f json                  # Save JSON report
+  {sys.argv[0]} -r 5 -i                     # Auto-refresh every 5 seconds
+  {sys.argv[0]} --sensors --interactive     # Show sensors in interactive mode
+  {sys.argv[0]} --benchmark --save          # Run benchmark and save results
+
+Visit: {Config.WEBSITE}
+            """
         )
-        parser.add_argument(
-            "--info", "-i",
+
+        # Mode options
+        mode_group = parser.add_argument_group('Mode Options')
+        mode_group.add_argument(
+            "-i", "--interactive",
             action="store_true",
-            help="Show CPU information and exit"
+            help="Run in interactive mode with command prompt"
         )
-        parser.add_argument(
-            "--sensors", "-s",
+
+        mode_group.add_argument(
+            "--sensors",
             action="store_true",
-            help="Show CPU sensors and exit"
+            help="Display sensor readings (temperature, usage, etc.)"
         )
-        parser.add_argument(
-            "--monitor", "-m",
+
+        mode_group.add_argument(
+            "--benchmark",
             action="store_true",
-            help="Start live monitoring mode"
+            help="Run CPU benchmark tests"
         )
-        parser.add_argument(
-            "--admin", "-a",
+
+        # Output options
+        output_group = parser.add_argument_group('Output Options')
+        output_group.add_argument(
+            "-s", "--save",
             action="store_true",
-            help="Run as administrator (Windows only)"
+            help="Save CPU information report"
         )
-        parser.add_argument(
-            "--version", "-v",
-            action="version",
-            version=f"{Const.APP_NAME} {Const.APP_VERSION}"
+
+        output_group.add_argument(
+            "-f", "--format",
+            choices=Config.SUPPORTED_FORMATS,
+            default="all",
+            help="Format for saving reports"
+        )
+
+        output_group.add_argument(
+            "-o", "--output-dir",
+            type=str,
+            default=Config.DEFAULT_OUTPUT_DIR,
+            help="Directory for saving reports"
+        )
+
+        # Display options
+        display_group = parser.add_argument_group('Display Options')
+        display_group.add_argument(
+            "-r", "--refresh",
+            type=int,
+            default=0,
+            metavar="SECONDS",
+            help=f"Auto-refresh interval ({Config.MIN_REFRESH_INTERVAL}-{Config.MAX_REFRESH_INTERVAL}s, 0 to disable)"
+        )
+
+        display_group.add_argument(
+            "--compact",
+            action="store_true",
+            help="Use compact display format"
+        )
+
+        display_group.add_argument(
+            "--no-color",
+            action="store_true",
+            help="Disable colored output"
+        )
+
+        # Information options
+        info_group = parser.add_argument_group('Information Options')
+        info_group.add_argument(
+            "-v", "--version",
+            action="store_true",
+            help="Show application version and exit"
+        )
+
+        info_group.add_argument(
+            "--info",
+            action="store_true",
+            help="Show detailed system information and exit"
         )
 
         args = parser.parse_args()
 
-        if args.admin and os.name == 'nt':
-            if _run_as_admin():
-                sys.exit(0)
+        # Validate refresh interval
+        if args.refresh > 0:
+            if args.refresh < Config.MIN_REFRESH_INTERVAL:
+                args.refresh = Config.MIN_REFRESH_INTERVAL
+            elif args.refresh > Config.MAX_REFRESH_INTERVAL:
+                args.refresh = Config.MAX_REFRESH_INTERVAL
 
-        if args.info:
-            self._clear_console()
-            self._print_header()
-            self._print_cpu_info()
-            sys.exit(0)
-        elif args.sensors:
-            self._clear_console()
-            self._print_header()
-            self._print_cpu_sensors()
-            sys.exit(0)
-        elif args.monitor:
-            self._clear_console()
-            self._print_header()
-            self._start_live_monitor()
-            sys.exit(0)
-
-    def _print_help(self) -> None:
-        """Print help section"""
-        self._clear_console()
-        self._print_header()
-
-        help_text = f"""
-{Colors.BRIGHT}{Colors.CYAN}HELP - CPU Monitor Commands{Colors.RESET}
-{Colors.YELLOW}{'=' * 50}{Colors.RESET}
-
-{Colors.BRIGHT}Interactive Menu Options:{Colors.RESET}
-  {Colors.GREEN}1{Colors.RESET} - Show detailed CPU information
-  {Colors.GREEN}2{Colors.RESET} - Show current CPU sensor readings
-  {Colors.GREEN}3{Colors.RESET} - Start live monitoring mode
-  {Colors.GREEN}4{Colors.RESET} - Show this help screen
-  {Colors.GREEN}5{Colors.RESET} - Show about information
-  {Colors.GREEN}q{Colors.RESET} - Quit application
-
-{Colors.BRIGHT}Command Line Options:{Colors.RESET}
-  {Colors.GREEN}--info, -i{Colors.RESET}     Show CPU info and exit
-  {Colors.GREEN}--sensors, -s{Colors.RESET}  Show sensors and exit
-  {Colors.GREEN}--monitor, -m{Colors.RESET}  Start live monitoring
-  {Colors.GREEN}--admin, -a{Colors.RESET}    Run as administrator (Windows)
-  {Colors.GREEN}--help, -h{Colors.RESET}     Show command line help
-  {Colors.GREEN}--version, -v{Colors.RESET}  Show version information
-
-{Colors.BRIGHT}Live Monitor Controls:{Colors.RESET}
-  {Colors.GREEN}Press 'q' or Ctrl+C{Colors.RESET} to exit live monitoring
-
-{Colors.BRIGHT}Examples:{Colors.RESET}
-  python cpu_monitor.py --info
-  python cpu_monitor.py --monitor
-  python cpu_monitor.py --admin --sensors
-        """
-
-        print(help_text)
-        self._get_user_input()
-
-    def _print_about(self) -> None:
-        """Print about section"""
-        self._clear_console()
-        self._print_header()
-
-        about_text = f"""
-{Colors.BRIGHT}{Colors.MAGENTA}ABOUT - {Const.APP_NAME}{Colors.RESET}
-{Colors.YELLOW}{'=' * 50}{Colors.RESET}
-
-{Colors.BRIGHT}Application:{Colors.RESET} {Const.APP_NAME}
-{Colors.BRIGHT}Version:{Colors.RESET}     {Const.APP_VERSION}
-{Colors.BRIGHT}Author:{Colors.RESET}      {Const.APP_AUTHOR}
-
-{Colors.BRIGHT}Description:{Colors.RESET}
-This is a comprehensive CPU monitoring tool that provides detailed
-information about your processor and real-time sensor readings.
-
-{Colors.BRIGHT}Features:{Colors.RESET}
-• Detailed CPU specifications and capabilities
-• Real-time temperature and usage monitoring
-• Live monitoring mode with continuous updates
-• Cross-platform support (Windows, Linux, macOS)
-• Command-line interface with multiple options
-• Colorized output for better readability
-
-{Colors.BRIGHT}Requirements:{Colors.RESET}
-• Python 3.6+
-• processorpy library
-• colorama library (optional, for colors)
-
-{Colors.BRIGHT}Platform:{Colors.RESET} {sys.platform}
-{Colors.BRIGHT}Python:{Colors.RESET}   {sys.version.split()[0]}
-        """
-
-        print(about_text)
-        self._get_user_input()
-
-    def _print_cpu_sensors(self) -> None:
-        """Print CPU sensor readings with real-time updates"""
-        try:
-            sensor_data = self.sensors.get_cpu_temperature()
-            usage_data = self.sensors.get_cpu_usage()
-
-            print(f"\n{Colors.BRIGHT}{Colors.CYAN}CPU SENSOR READINGS{Colors.RESET}")
-            print(f"{Colors.YELLOW}{'=' * 50}{Colors.RESET}")
-            print(f"{Colors.DIM}Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Colors.RESET}")
-
-            # Temperature readings
-            if sensor_data:
-                print(f"\n{Colors.BRIGHT}Temperature Sensors:{Colors.RESET}")
-                for sensor, temp in sensor_data.items():
-                    color = Colors.GREEN
-                    if temp > 70:
-                        color = Colors.YELLOW
-                    elif temp > 85:
-                        color = Colors.RED
-                    print(f"  {sensor}: {color}{temp:.1f}°C{Colors.RESET}")
-            else:
-                print(f"\n{Colors.YELLOW}Temperature sensors not available{Colors.RESET}")
-
-            # CPU Usage
-            if usage_data:
-                print(f"\n{Colors.BRIGHT}CPU Usage:{Colors.RESET}")
-                if isinstance(usage_data, (int, float)):
-                    color = Colors.GREEN if usage_data < 70 else Colors.YELLOW if usage_data < 90 else Colors.RED
-                    print(f"  Overall: {color}{usage_data:.1f}%{Colors.RESET}")
-                elif isinstance(usage_data, list):
-                    for i, usage in enumerate(usage_data):
-                        color = Colors.GREEN if usage < 70 else Colors.YELLOW if usage < 90 else Colors.RED
-                        print(f"  Core {i}: {color}{usage:.1f}%{Colors.RESET}")
-            else:
-                print(f"\n{Colors.YELLOW}CPU usage data not available{Colors.RESET}")
-
-        except Exception as e:
-            print(f"{Colors.RED}Error reading sensors: {e}{Colors.RESET}")
-
-    def _print_cpu_info(self) -> None:
-        """Print detailed CPU information"""
-        print(f"\n{Colors.BRIGHT}{Colors.CYAN}CPU INFORMATION{Colors.RESET}")
-        print(f"{Colors.YELLOW}{'=' * 50}{Colors.RESET}")
-
-        try:
-            info_map = {
-                'brand': 'Processor Brand',
-                'model': 'Model',
-                'architecture': 'Architecture',
-                'cores': 'Physical Cores',
-                'threads': 'Logical Processors',
-                'frequency': 'Base Frequency',
-                'max_frequency': 'Max Frequency',
-                'cache_l1': 'L1 Cache',
-                'cache_l2': 'L2 Cache',
-                'cache_l3': 'L3 Cache',
-                'stepping': 'Stepping',
-                'family': 'Family',
-                'vendor': 'Vendor'
-            }
-
-            for key, label in info_map.items():
-                if key in self.cpu_info and self.cpu_info[key]:
-                    value = self.cpu_info[key]
-                    if key in ['frequency', 'max_frequency'] and isinstance(value, (int, float)):
-                        value = f"{value / 1000:.2f} GHz" if value > 1000 else f"{value} MHz"
-                    elif key in ['cache_l1', 'cache_l2', 'cache_l3'] and isinstance(value, (int, float)):
-                        value = f"{value} KB" if value < 1024 else f"{value / 1024:.1f} MB"
-
-                    print(f"{Colors.BRIGHT}{label}:{Colors.RESET} {Colors.GREEN}{value}{Colors.RESET}")
-
-            # Additional system information
-            print(f"\n{Colors.BRIGHT}System Information:{Colors.RESET}")
-            print(f"{Colors.BRIGHT}Platform:{Colors.RESET} {Colors.GREEN}{sys.platform}{Colors.RESET}")
-            print(f"{Colors.BRIGHT}Python Version:{Colors.RESET} {Colors.GREEN}{sys.version.split()[0]}{Colors.RESET}")
-
-        except Exception as e:
-            print(f"{Colors.RED}Error displaying CPU info: {e}{Colors.RESET}")
-
-    def _print_header(self) -> None:
-        """Print application header"""
-        header = f"""
-{Colors.BRIGHT}{Colors.BLUE}╔{'═' * (Const.CONSOLE_WIDTH - 2)}╗{Colors.RESET}
-{Colors.BRIGHT}{Colors.BLUE}║{self._center_text(f"{Const.APP_NAME} v{Const.APP_VERSION}", Const.CONSOLE_WIDTH - 2)}║{Colors.RESET}
-{Colors.BRIGHT}{Colors.BLUE}║{self._center_text(Const.APP_AUTHOR, Const.CONSOLE_WIDTH - 2)}║{Colors.RESET}
-{Colors.BRIGHT}{Colors.BLUE}╚{'═' * (Const.CONSOLE_WIDTH - 2)}╝{Colors.RESET}
-        """
-        print(header)
-
-    def _print_menu(self) -> None:
-        """Print the main menu"""
-        menu = f"""
-{Colors.BRIGHT}{Colors.CYAN}MAIN MENU{Colors.RESET}
-{Colors.YELLOW}{'=' * 20}{Colors.RESET}
-
-{Colors.GREEN}1{Colors.RESET} - Show CPU Information
-{Colors.GREEN}2{Colors.RESET} - Show CPU Sensors
-{Colors.GREEN}3{Colors.RESET} - Live Monitor Mode
-{Colors.GREEN}4{Colors.RESET} - Help
-{Colors.GREEN}5{Colors.RESET} - About
-{Colors.GREEN}q{Colors.RESET} - Quit
-
-{Colors.BRIGHT}Select an option:{Colors.RESET} """
-
-        print(menu, end="")
-
-    def _get_user_input(self) -> str:
-        """Get user input and handle KeyboardInterrupt"""
-        try:
-            return input(f"\n{Colors.BRIGHT}Press Enter to continue...{Colors.RESET}").strip().lower()
-        except KeyboardInterrupt:
-            print(f"\n{Colors.YELLOW}Interrupted by user{Colors.RESET}")
-            return "q"
-
-    def _clear_console(self) -> None:
-        """Clear the console screen"""
-        os.system('cls' if os.name == 'nt' else 'clear')
-
-    def _set_title(self) -> None:
-        """Set console title for both Linux and Windows"""
-        title = f"{Const.APP_NAME} v{Const.APP_VERSION}"
-        if os.name == 'nt':
-            os.system(f'title {title}')
-        else:
-            sys.stdout.write(f'\033]0;{title}\007')
-            sys.stdout.flush()
-
-    def _start_live_monitor(self) -> None:
-        """Start live monitoring mode"""
-        print(f"\n{Colors.BRIGHT}{Colors.GREEN}LIVE MONITORING MODE{Colors.RESET}")
-        print(f"{Colors.YELLOW}Press 'q' + Enter or Ctrl+C to exit{Colors.RESET}\n")
-
-        self.running = True
-
-        def monitor_loop():
-            while self.running:
-                try:
-                    # Clear and show current readings
-                    if os.name == 'nt':
-                        os.system('cls')
-                    else:
-                        print('\033[H\033[J', end='')
-
-                    self._print_header()
-                    self._print_cpu_sensors()
-                    print(
-                        f"\n{Colors.DIM}Updating every {Const.UPDATE_INTERVAL}s... Press 'q' + Enter to exit{Colors.RESET}")
-
-                    time.sleep(Const.UPDATE_INTERVAL)
-                except Exception as e:
-                    print(f"{Colors.RED}Monitor error: {e}{Colors.RESET}")
-                    break
-
-        # Start monitoring in a separate thread
-        self.monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
-        self.monitor_thread.start()
-
-        # Wait for user input to stop
-        try:
-            while self.running:
-                user_input = input().strip().lower()
-                if user_input == 'q':
-                    break
-        except KeyboardInterrupt:
-            pass
-        finally:
-            self.running = False
-            if self.monitor_thread:
-                self.monitor_thread.join(timeout=2)
+        return args
 
     def run(self) -> None:
-        """Main application entry point"""
-        self._set_title()
-        self._handle_parameters()
+        """Main entry point - run the Interface tool based on provided arguments"""
 
-        while True:
+        # Handle version flag
+        if self.args.version:
+            self._display_version()
+            return
+
+        # Handle info flag
+        if self.args.info:
+            self._display_system_info()
+            return
+
+        # Set up auto-refresh if requested
+        if self.args.refresh > 0:
+            self.auto_refresh = True
+            self._start_auto_refresh()
+
+        # Initial display
+        self._refresh_display()
+
+        # Run benchmark if requested
+        if self.args.benchmark:
+            self._run_benchmark()
+
+        # Save reports if requested
+        if self.args.save:
+            self._save_reports()
+
+        # Enter interactive mode if requested or as default
+        if self.args.interactive or not any([self.args.save, self.args.benchmark, self.args.info]):
+            self.args.interactive = True
+            self._run_interactive_mode()
+
+    def _refresh_display(self) -> None:
+        """Refresh the main display with current CPU information"""
+
+        try:
+            # Clear screen
+            self._clear_screen()
+
+            # Update data
+            self.cpu_info = self.processor.get_all_info()
+            if self.args.sensors:
+                self.sensor_data = self._get_sensor_data()
+
+            # Display components
+            self._display_header()
+            self._display_cpu_info()
+
+            if self.args.sensors:
+                self._display_sensor_data()
+
+            # Update statistics
+            self.last_update = datetime.datetime.now()
+            self.refresh_count += 1
+
+            # Display footer with statistics
+            self._display_footer()
+
+            # Display command menu in interactive mode
+            if self.args.interactive:
+                self._display_command_menu()
+
+        except ProcessorPyException as e:
+            print(f"{Colors.ERROR}Error refreshing display: {e}{Colors.END}")
+
+    def _get_sensor_data(self) -> Dict[str, Any]:
+        """Get current sensor readings"""
+        try:
+            sensor_info = {}
+
+            # Get temperature data
+            if hasattr(self.sensors, 'get_temperature'):
+                sensor_info['temperature'] = self.sensors.get_temperature()
+
+            # Get CPU usage
+            if hasattr(self.sensors, 'get_cpu_usage'):
+                sensor_info['cpu_usage'] = self.sensors.get_cpu_usage()
+
+            # Get frequency information
+            if hasattr(self.sensors, 'get_frequency'):
+                sensor_info['frequency'] = self.sensors.get_frequency()
+
+            return sensor_info
+
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
+    def _clear_screen() -> None:
+        """Clear the terminal screen"""
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+    def _set_terminal_title(self) -> None:
+        """Set the terminal window title"""
+        try:
+            title = f"{Config.APP_NAME} v{Config.VERSION}"
+            if os.name == 'nt':  # Windows
+                os.system(f'title {title}')
+            else:  # Unix-like systems
+                print(f'\033]0;{title}\007', end='')
+        except OSError:
+            pass  # Ignore if unable to set title
+
+    @staticmethod
+    def _strip_ansi(text: str) -> str:
+        """Remove ANSI escape codes from a string"""
+        return re.sub(r'\x1B[@-_][0-?]*[ -/]*[@-~]', '', text)
+
+    def _center_text(self, text: str) -> str:
+        """Center text considering ANSI codes"""
+        plain_text = self._strip_ansi(text)
+        padding = max(0, (self.terminal_width - len(plain_text)) // 2)
+        return f"{' ' * padding}{text}"
+
+    def _display_header(self) -> None:
+        """Display application header with branding"""
+
+        header_lines = [
+            f"{Colors.HEADER}╔{'═' * (self.terminal_width - 2)}╗{Colors.END}",
+            f"{Colors.HEADER}║{self._center_text(f'{Config.APP_NAME} v{Config.VERSION}')[1:]}║{Colors.END}",
+            f"{Colors.HEADER}║{self._center_text(f'Developed by {Config.AUTHOR}')[1:]}║{Colors.END}",
+            f"{Colors.HEADER}║{self._center_text(Config.WEBSITE)[1:]}║{Colors.END}",
+            f"{Colors.HEADER}╚{'═' * (self.terminal_width - 2)}╝{Colors.END}",
+        ]
+
+        for line in header_lines:
+            print(line)
+        print()
+
+    def _display_version(self) -> None:
+        """Display detailed version and system information"""
+
+        print(f"\n{Colors.HEADER}{Config.APP_NAME}{Colors.END}")
+        print(f"{Colors.BOLD}Version  : {Colors.END}        {Config.VERSION}")
+        print(f"{Colors.BOLD}Author   : {Colors.END}         {Config.AUTHOR}")
+        print(f"{Colors.BOLD}Website  : {Colors.END}        {Config.WEBSITE}")
+        print(f"{Colors.BOLD}Python   : {Colors.END}         {sys.version.split()[0]}")
+        print(f"{Colors.BOLD}Platform : {Colors.END}       {sys.platform}")
+
+        try:
+            from processorpy import __version__ as processorpy_version
+            print(f"{Colors.BOLD}ProcessorPy:{Colors.END}    v{processorpy_version}")
+
+        except ImportError:
+            print(f"{Colors.BOLD}ProcessorPy:{Colors.END}    Version unknown")
+
+    def _display_system_info(self) -> None:
+        """Display comprehensive system information"""
+
+        self._clear_screen()
+        self._display_header()
+
+        print(f"{Colors.SUBHEADER}SYSTEM INFORMATION{Colors.END}")
+        print(f"{Colors.BOLD}{'─' * self.terminal_width}{Colors.END}")
+
+        # Get and display CPU info
+        info = self.cpu_info
+
+        # Critical information first
+        critical_keys = ['brand', 'architecture', 'cores', 'threads', 'base_frequency', 'max_frequency']
+
+        for key in critical_keys:
+            if key in info:
+                label = key.replace('_', ' ').title()
+                value = info[key]
+                print(f"{Colors.BOLD}{label + ':':<20}{Colors.END} {Colors.INFO}{value}{Colors.END}")
+
+        print()
+
+        # Additional information
+        print(f"{Colors.SUBHEADER}DETAILED SPECIFICATIONS{Colors.END}")
+        print(f"{Colors.BOLD}{'─' * self.terminal_width}{Colors.END}")
+
+        remaining_keys = [k for k in sorted(info.keys()) if k not in critical_keys]
+
+        for key in remaining_keys:
+            label = key.replace('_', ' ').title()
+            value = info[key]
+
+            # Format boolean values
+            if isinstance(value, bool):
+                value = "Yes" if value else "No"
+                color = Colors.SUCCESS if value == "Yes" else Colors.WARNING
+            else:
+                color = Colors.INFO
+
+            print(f"{Colors.BOLD}{label + ':':<25}{Colors.END} {color}{value}{Colors.END}")
+
+    def _format_info_line(self, label: str, value: Any, color_code: str = "") -> str:
+        """Format an information line with aligned columns"""
+
+        label_width = 25 if not self.args.compact else 20
+
+        # Format boolean values
+        if isinstance(value, bool):
+            value = "Yes" if value else "No"
+            if not color_code:
+                color_code = Colors.SUCCESS if value == "Yes" else Colors.WARNING
+
+        # Apply color formatting
+        if color_code:
+            formatted_value = f"{color_code}{value}{Colors.END}"
+        else:
+            formatted_value = f"{Colors.INFO}{value}{Colors.END}"
+
+        return f"{Colors.BOLD}{label + ':':<{label_width}}{Colors.END} {formatted_value}"
+
+    def _display_cpu_info(self) -> None:
+        """Display CPU information with enhanced formatting"""
+
+        print(f"{Colors.SUBHEADER}PROCESSOR INFORMATION{Colors.END}")
+        print(f"{Colors.BOLD}{'─' * self.terminal_width}{Colors.END}")
+
+        info: dict[str, str] = self.cpu_info
+
+        # Priority order for display
+        priority_keys: tuple[str] = (
+            'brand', 'architecture', 'cores', 'threads',
+            'base_frequency', 'max_frequency', 'cache_l1',
+            'cache_l2', 'cache_l3', 'family', 'model', 'stepping'
+        )
+
+        # Display priority information first
+        for key in priority_keys:
+            if key in info:
+                label = key.replace('_', ' ').title()
+                value = info[key].value
+
+                # Special formatting for certain fields
+                if 'frequency' in key and isinstance(value, (int, float)):
+                    if value >= 1000:
+                        value = f"{value / 1000:.2f} GHz"
+                    else:
+                        value = f"{value} MHz"
+                elif 'cache' in key:
+                    label = label.replace('Cache ', 'L').replace('l', 'L')
+
+                print(self._format_info_line(label, value))
+
+        # Display remaining information
+        remaining_keys = sorted([k for k in info.keys() if k not in priority_keys])
+
+        if remaining_keys and not self.args.compact:
+            print(f"\n{Colors.DIM}Additional Information:{Colors.END}")
+            for key in remaining_keys:
+                label = key.replace('_', ' ').title()
+                value = info[key].value
+
+                print(self._format_info_line(label, value))
+
+    def _display_sensor_data(self) -> None:
+        """Display real-time sensor information"""
+
+        if not self.sensor_data:
+            return
+
+        print(f"\n{Colors.SUBHEADER}SENSOR READINGS{Colors.END}")
+        print(f"{Colors.BOLD}{'─' * self.terminal_width}{Colors.END}")
+
+        for sensor_type, data in self.sensor_data.items():
+            if sensor_type == 'error':
+                print(f"{Colors.ERROR}Sensor Error: {data}{Colors.END}")
+                continue
+
+            label = sensor_type.replace('_', ' ').title()
+
+            if isinstance(data, dict):
+                print(f"{Colors.BOLD}{label}:{Colors.END}")
+                for key, value in data.items():
+                    sub_label = f"  {key.replace('_', ' ').title()}"
+
+                    # Color coding for temperature
+                    if 'temperature' in sensor_type and isinstance(value, (int, float)):
+                        if value > 80:
+                            color = Colors.ERROR
+                        elif value > 60:
+                            color = Colors.WARNING
+                        else:
+                            color = Colors.SUCCESS
+                        print(f"{sub_label:<23} {color}{value}°C{Colors.END}")
+                    else:
+                        print(f"{sub_label:<23} {Colors.INFO}{value}{Colors.END}")
+            else:
+                print(self._format_info_line(label, data))
+
+    def _display_footer(self) -> None:
+        """Display footer with runtime statistics"""
+
+        print(f"\n{Colors.BOLD}{'─' * self.terminal_width}{Colors.END}")
+
+        # Calculate runtime
+        runtime = datetime.datetime.now() - self.start_time
+        runtime_str = str(runtime).split('.')[0]  # Remove microseconds
+
+        # Last update time
+        update_time = self.last_update.strftime('%H:%M:%S') if self.last_update else "Never"
+
+        footer_info = [
+            f"Runtime: {runtime_str}",
+            f"Updates: {self.refresh_count}",
+            f"Last Update: {update_time}"
+        ]
+
+        if self.auto_refresh:
+            footer_info.append(f"Auto-refresh: {self.args.refresh}s")
+
+        footer_text = " | ".join(footer_info)
+        print(f"{Colors.DIM}{footer_text}{Colors.END}")
+
+    def _display_command_menu(self) -> None:
+        """Display command menu for interactive mode"""
+
+        commands = [
+            f"{Colors.SUCCESS}[r]{Colors.END} refresh",
+            f"{Colors.SUCCESS}[s]{Colors.END} sensors",
+            f"{Colors.SUCCESS}[b]{Colors.END} benchmark",
+            f"{Colors.SUCCESS}[save]{Colors.END} report",
+            f"{Colors.SUCCESS}[q]{Colors.END} quit"
+        ]
+
+        print(f"\n{Colors.BOLD}Commands:{Colors.END} {' | '.join(commands)}")
+
+    def _display_command_help(self) -> None:
+        """Display comprehensive command help"""
+
+        commands = [
+            ("refresh (r)", "Refresh CPU and sensor information"),
+            ("sensors (s)", "Toggle sensor display on/off"),
+            ("benchmark (b)", "Run CPU benchmark tests"),
+            ("save (save)", "Save detailed CPU report"),
+            ("auto [interval]", "Toggle auto-refresh (optional interval in seconds)"),
+            ("clear (c)", "Clear the screen"),
+            ("info (i)", "Show detailed system information"),
+            ("help (h, ?)", "Show this help message"),
+            ("version (v)", "Show version information"),
+            ("quit (q, exit, bye)", "Exit the application")
+        ]
+
+        print(f"\n{Colors.HEADER}AVAILABLE COMMANDS{Colors.END}")
+        print(f"{Colors.BOLD}{'─' * 60}{Colors.END}")
+
+        max_cmd_len = max(len(cmd[0]) for cmd in commands)
+
+        for cmd, desc in commands:
+            print(f"{Colors.SUCCESS}{cmd.ljust(max_cmd_len + 2)}{Colors.END}{desc}")
+
+        print(f"\n{Colors.DIM}Tip: Most commands can be abbreviated to their first letter{Colors.END}")
+
+    def _run_benchmark(self) -> None:
+        """Run CPU benchmark tests"""
+
+        print(f"\n{Colors.WARNING}Running CPU Benchmark...{Colors.END}")
+        print(f"{Colors.DIM}This may take a few moments{Colors.END}")
+
+        # Placeholder for benchmark implementation
+        # You would implement actual CPU benchmark tests here
+
+        import time
+        for i in range(5):
+            print(f"{Colors.INFO}Benchmark step {i + 1}/5...{Colors.END}")
+            time.sleep(1)
+
+        print(f"{Colors.SUCCESS}Benchmark completed!{Colors.END}")
+
+    def _start_auto_refresh(self) -> None:
+        """Start auto-refresh in a separate thread"""
+
+        def refresh_loop():
+            while self.auto_refresh and self.running:
+                sleep(self.args.refresh)
+                if self.running and not self.args.interactive:
+                    self._refresh_display()
+
+        self.refresh_thread = threading.Thread(target=refresh_loop, daemon=True)
+        self.refresh_thread.start()
+
+    def _stop_auto_refresh(self) -> None:
+        """Stop auto-refresh"""
+        self.auto_refresh = False
+        if self.refresh_thread and self.refresh_thread.is_alive():
+            self.refresh_thread.join(timeout=1)
+
+    def _run_interactive_mode(self) -> None:
+        """Run the application in interactive mode with enhanced command handling"""
+
+        self.running = True
+        self._set_terminal_title()
+
+        print(f"\n{Colors.INFO}Interactive mode active. Type 'help' for commands.{Colors.END}")
+
+        while self.running:
             try:
-                self._clear_console()
-                self._print_header()
-                self._print_menu()
+                user_input = input(f"{Colors.BOLD}>{Colors.END} ").strip().lower()
 
-                choice = input().strip().lower()
+                if not user_input:
+                    continue
 
-                if choice == Const.MENU_CPU_INFO:
-                    self._clear_console()
-                    self._print_header()
-                    self._print_cpu_info()
-                    self._get_user_input()
+                # Parse command and arguments
+                parts = user_input.split()
+                command = parts[0]
+                args = parts[1:] if len(parts) > 1 else []
 
-                elif choice == Const.MENU_CPU_SENSORS:
-                    self._clear_console()
-                    self._print_header()
-                    self._print_cpu_sensors()
-                    self._get_user_input()
+                # Handle commands
+                if command in ('q', 'quit', 'exit', 'bye'):
+                    self._handle_quit()
 
-                elif choice == Const.MENU_LIVE_MONITOR:
-                    self._clear_console()
-                    self._print_header()
-                    self._start_live_monitor()
+                elif command in ('r', 'refresh'):
+                    self._refresh_display()
 
-                elif choice == Const.MENU_HELP:
-                    self._print_help()
+                elif command in ('s', 'sensors'):
+                    self.args.sensors = not self.args.sensors
+                    status = "enabled" if self.args.sensors else "disabled"
+                    print(f"{Colors.INFO}Sensor display {status}{Colors.END}")
+                    self._refresh_display()
 
-                elif choice == Const.MENU_ABOUT:
-                    self._print_about()
+                elif command in ('b', 'benchmark'):
+                    self._run_benchmark()
+                    self._wait_for_input()
+                    self._refresh_display()
 
-                elif choice == Const.MENU_EXIT:
-                    print(f"\n{Colors.BRIGHT}{Colors.GREEN}Thank you for using {Const.APP_NAME}!{Colors.RESET}")
-                    break
+                elif command == 'save':
+                    self._save_reports()
+                    self._wait_for_input()
+                    self._refresh_display()
+
+                elif command == 'auto':
+                    self._handle_auto_refresh(args)
+
+                elif command in ('c', 'clear'):
+                    self._refresh_display()
+
+                elif command in ('i', 'info'):
+                    self._display_system_info()
+                    self._wait_for_input()
+                    self._refresh_display()
+
+                elif command in ('v', 'version'):
+                    self._display_version()
+                    self._wait_for_input()
+                    self._refresh_display()
+
+                elif command in ('h', '?', 'help'):
+                    self._display_command_help()
+                    self._wait_for_input()
+                    self._refresh_display()
 
                 else:
-                    print(f"\n{Colors.RED}Invalid option. Please try again.{Colors.RESET}")
-                    time.sleep(1)
+                    print(
+                        f"{Colors.ERROR}Unknown command: '{command}'. Type 'help' for available commands.{Colors.END}")
 
             except KeyboardInterrupt:
-                print(f"\n\n{Colors.YELLOW}Exiting...{Colors.RESET}")
-                break
+                self._handle_quit()
+
+            except EOFError:
+                self._handle_quit()
+
             except Exception as e:
-                print(f"\n{Colors.RED}Unexpected error: {e}{Colors.RESET}")
-                print("Please report this issue.")
-                time.sleep(2)
+                print(f"{Colors.ERROR}Error: {e}{Colors.END}")
+
+    def _handle_quit(self) -> None:
+        """Handle application quit with cleanup"""
+
+        self.running = False
+        self._stop_auto_refresh()
+
+        print(f"\n{Colors.WARNING}Shutting down {Config.APP_NAME}...{Colors.END}")
+        sleep(1)
+
+        print(f"{Colors.SUCCESS}Thank you for using {Config.APP_NAME}!{Colors.END}")
+        sys.exit(0)
+
+    def _handle_auto_refresh(self, args: List[str]) -> None:
+        """Handle auto-refresh toggle and configuration"""
+
+        if self.auto_refresh:
+            self._stop_auto_refresh()
+            print(f"{Colors.INFO}Auto-refresh disabled{Colors.END}")
+        else:
+            # Parse interval if provided
+            if args:
+                try:
+                    interval = int(args[0])
+                    if Config.MIN_REFRESH_INTERVAL <= interval <= Config.MAX_REFRESH_INTERVAL:
+                        self.args.refresh = interval
+                    else:
+                        print(
+                            f"{Colors.WARNING}Invalid interval. Using default: {Config.DEFAULT_REFRESH_INTERVAL}s{Colors.END}")
+                        self.args.refresh = Config.DEFAULT_REFRESH_INTERVAL
+                except ValueError:
+                    print(
+                        f"{Colors.WARNING}Invalid interval format. Using default: {Config.DEFAULT_REFRESH_INTERVAL}s{Colors.END}")
+                    self.args.refresh = Config.DEFAULT_REFRESH_INTERVAL
+            elif self.args.refresh == 0:
+                self.args.refresh = Config.DEFAULT_REFRESH_INTERVAL
+
+            self.auto_refresh = True
+            self._start_auto_refresh()
+            print(f"{Colors.INFO}Auto-refresh enabled ({self.args.refresh}s interval){Colors.END}")
+
+    @staticmethod
+    def _wait_for_input() -> None:
+        """Wait for user input with styled prompt"""
+        input(f"\n{Colors.DIM}Press Enter to continue...{Colors.END}")
+
+    def _format_text_report(self) -> str:
+        """Format CPU information as a comprehensive text report"""
+
+        report = []
+        width = Config.REPORT_WIDTH
+
+        # Header
+        report.append("=" * width)
+        report.append(f"{Config.APP_NAME} - CPU Information Report".center(width))
+        report.append("=" * width)
+        report.append(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report.append(f"Runtime: {datetime.datetime.now() - self.start_time}")
+        report.append("=" * width)
+        report.append("")
+
+        # CPU Information
+        report.append("PROCESSOR INFORMATION".center(width))
+        report.append("-" * width)
+
+        info = self.cpu_info
+        label_width = 25
+
+        # Format all CPU information
+        for key in sorted(info.keys()):
+            label = key.replace('_', ' ').title()
+            value = info[key]
+
+            if isinstance(value, bool):
+                value = "Yes" if value else "No"
+
+            report.append(f"{label + ':':<{label_width}} {value}")
+
+        # Sensor data if available
+        if self.sensor_data:
+            report.append("")
+            report.append("SENSOR READINGS".center(width))
+            report.append("-" * width)
+
+            for sensor_type, data in self.sensor_data.items():
+                if sensor_type == 'error':
+                    report.append(f"Sensor Error: {data}")
+                    continue
+
+                label = sensor_type.replace('_', ' ').title()
+
+                if isinstance(data, dict):
+                    report.append(f"\n{label}:")
+                    for key, value in data.items():
+                        sub_label = f"  {key.replace('_', ' ').title()}"
+                        report.append(f"{sub_label + ':':<{label_width}} {value}")
+                else:
+                    report.append(f"{label + ':':<{label_width}} {data}")
+
+        # Footer
+        report.append("")
+        report.append("=" * width)
+        report.append(f"Report generated by {Config.APP_NAME} v{Config.VERSION}".center(width))
+        report.append(f"{Config.WEBSITE}".center(width))
+        report.append("=" * width)
+
+        return "\n".join(report)
+
+    def _format_csv_report(self) -> str:
+        """Format CPU information as CSV for data analysis"""
+
+        import csv
+        from io import StringIO
+
+        output = StringIO()
+        writer = csv.writer(output)
+
+        # Header
+        writer.writerow(['Timestamp', 'Category', 'Property', 'Value'])
+
+        timestamp = datetime.datetime.now().isoformat()
+
+        # CPU Information
+        for key, value in self.cpu_info.items():
+            writer.writerow([timestamp, 'CPU', key, str(value)])
+
+        # Sensor data if available
+        if self.sensor_data:
+            for sensor_type, data in self.sensor_data.items():
+                if isinstance(data, dict):
+                    for sub_key, sub_value in data.items():
+                        writer.writerow([timestamp, f'Sensor_{sensor_type}', sub_key, str(sub_value)])
+                else:
+                    writer.writerow([timestamp, 'Sensor', sensor_type, str(data)])
+
+        return output.getvalue()
+
+    def _save_reports(self) -> None:
+        """Save CPU information reports in specified formats"""
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Create output directory if it doesn't exist
+        os.makedirs(self.args.output_dir, exist_ok=True)
+
+        # Determine formats to save
+        formats = []
+        if self.args.format == "all":
+            formats = ["text", "json", "csv"]
+        elif self.args.format == "text":
+            formats = ["text"]
+        elif self.args.format == "json":
+            formats = ["json"]
+        elif self.args.format == "csv":
+            formats = ["csv"]
+
+        saved_files = []
+
+        for fmt in formats:
+            try:
+                if fmt == "text":
+                    filepath = os.path.join(self.args.output_dir, f"cpu_report_{timestamp}.txt")
+                    with open(filepath, "w", encoding='utf-8') as f:
+                        f.write(self._format_text_report())
+                    saved_files.append(("Text report", filepath))
+
+                elif fmt == "json":
+                    filepath = os.path.join(self.args.output_dir, f"cpu_report_{timestamp}.json")
+                    report_data = {
+                        "generated_by": Config.APP_NAME,
+                        "version": Config.VERSION,
+                        "timestamp": datetime.datetime.now().isoformat(),
+                        "runtime_seconds": (datetime.datetime.now() - self.start_time).total_seconds(),
+                        "refresh_count": self.refresh_count,
+                        "cpu_info": self.cpu_info,
+                        "sensor_data": self.sensor_data if self.sensor_data else None,
+                        "system_info": {
+                            "python_version": sys.version,
+                            "platform": sys.platform,
+                            "terminal_width": self.terminal_width
+                        }
+                    }
+
+                    with open(filepath, "w", encoding='utf-8') as f:
+                        json.dump(report_data, f, indent=2, default=str)
+                    saved_files.append(("JSON report", filepath))
+
+                elif fmt == "csv":
+                    filepath = os.path.join(self.args.output_dir, f"cpu_report_{timestamp}.csv")
+                    with open(filepath, "w", encoding='utf-8', newline='') as f:
+                        f.write(self._format_csv_report())
+                    saved_files.append(("CSV report", filepath))
+
+            except Exception as e:
+                print(f"{Colors.ERROR}Error saving {fmt} report: {e}{Colors.END}")
+
+        # Display save confirmation
+        if saved_files:
+            print(f"\n{Colors.SUCCESS}Reports saved successfully:{Colors.END}")
+            for report_type, path in saved_files:
+                file_size = os.path.getsize(path)
+                size_str = f"({file_size:,} bytes)" if file_size < 1024 else f"({file_size / 1024:.1f} KB)"
+                print(f"  {Colors.SUCCESS}✓ {report_type}: {Colors.END}{path} {Colors.DIM}{size_str}{Colors.END}")
+        else:
+            print(f"{Colors.ERROR}No reports were saved{Colors.END}")
 
 
-def main() -> None:
-    """Main function executed when script is run from command line"""
+def __main__() -> int:
+    """Main function to run the CPU monitoring Interface tool"""
+
     try:
-        app = Interface()
-        app.run()
+        # Create and run the interface
+        cli = Interface()
+        cli.run()
+        return 0
 
     except KeyboardInterrupt:
-        print(f"\n{Colors.YELLOW}Application interrupted by user{Colors.RESET}")
-        sys.exit(0)
+        print(f"\n{Colors.WARNING}Application interrupted by user{Colors.END}")
+        return 1
+
+    except ProcessorPyException as e:
+        print(f"{Colors.ERROR}ProcessorPy Error: {e}{Colors.END}")
+        return 1
+
     except Exception as e:
-        print(f"{Colors.RED}Fatal error: {e}{Colors.RESET}")
-        sys.exit(1)
+        print(f"{Colors.ERROR}Unexpected error: {e}{Colors.END}")
+        return 1
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    sys.exit(__main__())

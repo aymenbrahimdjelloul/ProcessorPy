@@ -13,41 +13,162 @@ license : MIT License
 
 # IMPORTS
 import sys
-import platform
+import subprocess
 from abc import ABC, abstractmethod
+from ._core import Const
+from typing import Union, Optional, List, Tuple
 
 
-# Declare platform string
-_platform: str = platform.system()
+try:
 
+    import ctypes
+    import winreg
+
+except ImportError:
+    pass
 
 class _Sensors(ABC):
+    """Abstract base class for system sensor monitoring.
+
+    This class defines the interface for retrieving various system sensor readings
+    like CPU clock speed, voltage, temperature, and usage statistics.
+    """
 
     @abstractmethod
-    def get_temperature(self) -> float:
-        """ This method will simulate the temperature sensor readings"""
-        return random.randint(45, 75)
+    def get_clock_speed(self, friendly: bool = False) -> Union[float, str]:
+        """Get the current CPU clock speed.
 
-    @abstractmethod
-    def get_voltage(self) -> float:
-        """ This method will simulate the voltage sensor readings"""
-        return random.uniform(1.15, 1.35)
+        Args:
+            friendly: If True, returns a human-readable string with units.
+                     If False, returns speed in MHz/GHz as float.
 
-    @abstractmethod
-    def get_usage(self, per_core: bool = False) -> int | tuple:
-        """ This method will simulate the usage sensor readings per core"""
-        return random.randint(20, 80)
-
-    @abstractmethod
-    def get_clock_speed(self, per_core: bool = False) -> int | tuple:
-        """ This method will simulate the clock speed sensor readings per core"""
-        return random.uniform(3.8, 5.1)
-
-if _platform == "Windows":
-
-    class Sensors:
+        Returns:
+            float: Clock speed in MHz/GHz when friendly=False
+            str: Formatted string (e.g., "3.5 GHz") when friendly=True
+        """
         pass
 
+    @abstractmethod
+    def get_cpu_voltage(self, friendly: bool = False) -> Union[float, str]:
+        """Get the current CPU voltage.
+
+        Args:
+            friendly: If True, returns a human-readable string with units.
+                     If False, returns voltage as float.
+
+        Returns:
+            float: Voltage in volts when friendly=False
+            str: Formatted string (e.g., "1.2V") when friendly=True
+        """
+        pass
+
+    @abstractmethod
+    def get_cpu_temperature(self,
+                            friendly: bool = False,
+                            sensor_id: Optional[int] = None) -> Union[float, str, List[Union[float, str]]]:
+        """Get CPU temperature reading(s).
+
+        Args:
+            friendly: If True, returns a human-readable string with units.
+                     If False, returns temperature as float.
+            sensor_id: Specific sensor to query. If None, returns all sensors.
+
+        Returns:
+            float: Temperature in Celsius when friendly=False and sensor_id specified
+            str: Formatted string (e.g., "45°C") when friendly=True and sensor_id specified
+            List: All sensor readings when sensor_id=None
+        """
+        pass
+
+    @abstractmethod
+    def get_cpu_usage(self,
+                      per_core: bool = False,
+                      interval: float = 0.1) -> Union[float, Tuple[float, ...]]:
+        """Get CPU usage percentage.
+
+        Args:
+            per_core: If True, returns usage for each core.
+                     If False, returns aggregate usage.
+            interval: Measurement interval in seconds.
+
+        Returns:
+            float: Aggregate CPU usage (0-100%) when per_core=False
+            Tuple: Per-core usage percentages when per_core=True
+        """
+        pass
+
+if Const.platform == "win32":
+
+    class Sensors(_Sensors):
+
+        def __init__(self):
+            super().__init__()
+
+        def get_clock_speed(self, friendly: bool = False) -> Union[float, str]:
+            """Get the current CPU clock speed.
+
+            Args:
+                friendly: If True, returns a human-readable string with units.
+                         If False, returns speed in MHz/GHz as float.
+
+            Returns:
+                float: Clock speed in MHz/GHz when friendly=False
+                str: Formatted string (e.g., "3.5 GHz") when friendly=True
+            """
+            pass
+
+        def get_cpu_voltage(self, friendly: bool = False) -> Union[float, str]:
+            """Get the current CPU voltage.
+
+            Args:
+                friendly: If True, returns a human-readable string with units.
+                         If False, returns voltage as float.
+
+            Returns:
+                float: Voltage in volts when friendly=False
+                str: Formatted string (e.g., "1.2V") when friendly=True
+            """
+            pass
+
+        def get_cpu_temperature(self,
+                                friendly: bool = False,
+                                sensor_id: Optional[int] = None) -> Union[float, str, List[Union[float, str]]]:
+            """Get CPU temperature reading(s).
+
+            Args:
+                friendly: If True, returns a human-readable string with units.
+                         If False, returns temperature as float.
+                sensor_id: Specific sensor to query. If None, returns all sensors.
+
+            Returns:
+                float: Temperature in Celsius when friendly=False and sensor_id specified
+                str: Formatted string (e.g., "45°C") when friendly=True and sensor_id specified
+                List: All sensor readings when sensor_id=None
+            """
+            pass
+
+        def get_cpu_usage(self,
+                          per_core: bool = False,
+                          interval: float = 0.1) -> Union[float, Tuple[float, ...]]:
+            """Get CPU usage percentage.
+
+            Args:
+                per_core: If True, returns usage for each core.
+                         If False, returns aggregate usage.
+                interval: Measurement interval in seconds.
+
+            Returns:
+                float: Aggregate CPU usage (0-100%) when per_core=False
+                Tuple: Per-core usage percentages when per_core=True
+            """
+            pass
+
+elif Const.platform == "linux":
+
+    class Sensors(_Sensors):
+
+        def __init__(self) -> None:
+            super().__init__()
 
 
 if __name__ == "__main__":

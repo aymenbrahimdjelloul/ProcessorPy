@@ -42,6 +42,7 @@ class Const:
 
     author: str = "Aymen Brahim Djelloul"
     version: str = "1.1"
+    platform: str = sys.platform
 
     # Define cache handler constants
     cache_dir: str = ".cache"
@@ -57,7 +58,7 @@ class Const:
 class CacheHandler:
     """ This CacheHandler is caching system with validation and expiration"""
 
-    def __init__(self, developer_mode: bool = False) -> None:
+    def __init__(self, developer_mode: bool = True) -> None:
 
         # Declare constants
         self.dev_mode: bool = developer_mode
@@ -69,18 +70,18 @@ class CacheHandler:
 
         # Find a valid cache file
         self.cache_file_path: str | None = self._find_cache()
-        self.cache_data: dict | None = None
+        self.cached_data: dict | None = None
         self.is_cache: bool = False
 
         if self.cache_file_path and self._is_cache_valid(self.cache_file_path):
 
             self.is_cache = True
-            self.cache_data = self._load_cache(self.cache_file_path)
+            self.cached_data = self._load_cache(self.cache_file_path)
 
             # Print developer message
             if self.dev_mode:
                 print("[INFO] : Use cache")
-                print(self.cache_data)
+                print(self.cached_data)
 
     def _find_cache(self) -> str | None:
         """Find and return a valid cache file path for this machine ID"""

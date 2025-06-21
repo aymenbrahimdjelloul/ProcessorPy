@@ -14,7 +14,6 @@ license : MIT
 
 # IMPORTS
 import re
-# import platform
 import subprocess
 import threading
 import logging
@@ -37,9 +36,7 @@ except ImportError:
     pass
 
 # Declare basic ProcessorPy constants
-_supported_platforms: tuple[str, str] = ("Windows", "Linux", "Darwin")
-_platform: str = sys.platform
-
+_supported_platforms: tuple = ("Windows", "Linux", "Darwin")
 
 class _Processor(ABC):
     """ This class contain the abstract methods """
@@ -126,11 +123,11 @@ class _Processor(ABC):
         # Create the local cache handler
         self._cache_handler = CacheHandler()
         # Define empty variable for store cached cpu info
-        self.cached_info: dict = self._get_cached_info() if self._cache_handler.is_cache else {}
+        self._cached_data: dict = self._cache_handler.cached_data
 
         # Pre-initialize critical data
         self._cpu_name: Optional[str] = None
-        self._manufacturer: Optional[str] = None
+        self._vendor: Optional[str] = None
 
     @abstractmethod
     def name(self) -> ProcessorPyResult:
@@ -138,7 +135,7 @@ class _Processor(ABC):
         pass
 
     @abstractmethod
-    def manufacturer(self) -> ProcessorPyResult:
+    def vendor(self) -> ProcessorPyResult:
         """Get CPU manufacturer"""
         pass
 
@@ -188,7 +185,7 @@ class _Processor(ABC):
         pass
 
     @abstractmethod
-    def cpu_tdp(self) -> ProcessorPyResult:
+    def tdp(self) -> ProcessorPyResult:
         """Get CPU TDP (estimated based on CPU model)"""
         pass
 
@@ -204,7 +201,7 @@ class _Processor(ABC):
 
     @abstractmethod
     def is_support_boost(self) -> ProcessorPyResult:
-        """ This method will check if the cpu have turbo boost featrue"""
+        """ This method will check if the cpu have turboboost featrue"""
         pass
 
     @abstractmethod
@@ -234,84 +231,112 @@ class _Processor(ABC):
         """ This method will get the maximum memory size supported by cpu"""
         pass
 
-    def get_all_info(self, parallel: bool = True) -> Dict[str, Any]:
-        """Collect comprehensive CPU information"""
+    @abstractmethod
+    def transistor_count(self) -> ProcessorPyResult:
+        """ This method will count the cpu transistor"""
+        pass
 
-        data: dict = {
-            # GENERAL
-            "name": self.name,
-            "Release date": self.release_date,
-            "manufacturer": self.manufacturer,
-            "Arch": self.architecture,
-            "Socket": self.socket,
-            "L1 Cache": self.get_cache_size(level=1, friendly=True),
-            "L2 Cache": self.get_cache_size(level=2, friendly=True),
-            "L3 Cache": self.get_cache_size(level=3, friendly=True),
-            "Max Speed": self.get_max_clock(friendly=True),
-            "Cores": self.get_cores(),
-            "Threads": self.get_cores(logical=True),
-            # FEATURES
-            "Lithography": self.lithography,
-            "TDP": self.cpu_tdp,
-            "Flags": self.flags,
-            "Support Virtualization": self.is_virtualization(),
-            "Support Turbo boost": self.is_support_boost(),
-            "Family": self.family,
-            "Stepping": self.stepping,
-            # MEMORY INTERFACE
-            "Memory supported types": self.supported_memory_types,
-            "Memory channels": self.supported_memory_channels,
-            "Max memory bandwidth": self.supported_memory_bandwidth,
-            "Max memory size": self.supported_memory_size,
-            "Support ECC": self.is_ecc,
+    def code_name(self) -> ProcessorPyResult:
+        """ This method will determine the cpu code nane string eg : ivy bridge, coffee lake"""
+        pass
+
+    def get_all_info(self, all_info: bool = False) -> Dict[str, Any]:
+        """Collect comprehensive CPU information
+
+        Args:
+            all_info: If True, returns extended CPU information including cache,
+                     memory interface, and feature details
+
+        Returns:
+            Dictionary containing CPU information with consistent data types
+        """
+
+        # Base CPU information (always included)
+        cpu_data: Dict[str, Any] = {
+            "cpu_name": self._safe_call(self.name),
+            "vendor": self._safe_call(self.vendor),
+            "release_date": self._safe_call(self.release_date),
+            "architecture": self._safe_call(self.architecture),
+            "code_name": self._safe_call(self.code_name),
+            "socket": self._safe_call(self.socket),
+            "cpu_tdp": self._safe_call(self.tdp),
+            "cpu_lithography": self._safe_call(self.lithography),
+            "cores": self._safe_call(self.get_cores),
+            "threads": self._safe_call(self.get_cores, logical=True),
         }
 
-        # Set cache file
-        # self._cache_handler.set_cache(data)
+        # Extended information if requested
+        if all_info:
+            extended_data: Dict[str, Any] = {
+                # Cache information
+                "l1_cache": self._safe_call(self.get_cache_size, level=1, friendly=True),
+                "l2_cache": self._safe_call(self.get_cache_size, level=2, friendly=True),
+                "l3_cache": self._safe_call(self.get_cache_size, level=3, friendly=True),
 
-        if self._dev_mode:
-            print("[INFO] : Cache file created !")
+                # Performance specs
+                "max_speed": self._safe_call(self.get_max_clock, friendly=True),
 
-        return data
+                # CPU Features
+                "flags": self._safe_call(self.flags),
+                "virtualization_support": self._safe_call(self.is_virtualization),
+                "turbo_boost_support": self._safe_call(self.is_support_boost),
+                "family": self._safe_call(self.family),
+                "stepping": self._safe_call(self.stepping),
 
-    def _get_cached_info(self) -> dict:
-        """This method will get the locally cached cpu info and return ProcessorPyResult objects"""
+                # Memory interface
+                "supported_memory_types": self._safe_call(self.supported_memory_types),
+                "memory_channels": self._safe_call(self.supported_memory_channels),
+                "max_memory_bandwidth": self._safe_call(self.supported_memory_bandwidth),
+                "max_memory_size": self._safe_call(self.supported_memory_size),
+                "ecc_support": self._safe_call(self.is_ecc),
+            }
 
-        cached_results = {}
+            # Merge extended data into base data
+            cpu_data.update(extended_data)
 
+            # Handle caching if needed
+            self._handle_caching(cpu_data)
+
+        return cpu_data
+
+    def _safe_call(self, method, *args, **kwargs) -> Any:
+        """Safely call a method and handle potential exceptions
+
+        Args:
+            method: The method to call
+            *args: Positional arguments for the method
+            **kwargs: Keyword arguments for the method
+
+        Returns:
+            Method result or None if an exception occurs
+        """
         try:
-
-            # Access the internal cache data
-            if hasattr(self._cache_handler, '_cache_data') and self._cache_handler.cache_data:
-                for key in self._cache_handler.cache_data.keys():
-                    try:
-                        cached_item = self._cache_handler.get_cached_data(key)
-
-                        if cached_item and all(
-                                field in cached_item for field in ["value", "is_accurate", "method"]):
-                            # Create ProcessorPyResult object from cached data
-                            cached_results[key] = ProcessorPyResult(
-                                value=cached_item["value"],
-                                is_accurate=cached_item["is_accurate"],
-                                method=cached_item["method"]
-                            )
-                        elif hasattr(self, 'dev_mode') and self.dev_mode:
-                            print(f"[DEBUG] Invalid cache item for key '{key}': {cached_item}")
-
-                    except Exception as e:
-                        if hasattr(self, 'dev_mode') and self.dev_mode:
-                            print(f"[DEBUG] Error processing cached item '{key}': {e}")
-                        continue
+            if callable(method):
+                return method(*args, **kwargs)
+            else:
+                # Handle properties/attributes
+                return method
 
         except Exception as e:
-            if hasattr(self, '_dev_mode') and self._dev_mode:
-                print(f"[DEBUG] Error in _get_cached_info: {e}")
-            return {}
+            if self._dev_mode:
+                print(f"[WARNING] Failed to get {method.__name__ if hasattr(method, '__name__') else str(method)}: {e}")
+            return None
 
-        if hasattr(self, '_dev_mode') and self._dev_mode:
-            print(f"[DEBUG] Retrieved {len(cached_results)} cached items")
+    def _handle_caching(self, data: Dict[str, Any]) -> None:
+        """Handle caching logic for CPU data
 
-        return cached_results
+        Args:
+            data: The CPU data dictionary to cache
+        """
+        try:
+            if hasattr(self, '_cache_handler') and self._cache_handler:
+                self._cache_handler.set_cache(data)
+
+                if self._dev_mode:
+                    print("[INFO] Cache file created successfully!")
+        except Exception as e:
+            if self._dev_mode:
+                print(f"[WARNING] Failed to create cache file: {e}")
 
     @lru_cache(maxsize=32)
     def _is_valid_string(self, value: str, min_length: int = 3) -> bool:
@@ -319,7 +344,7 @@ class _Processor(ABC):
         if not value or len(value.strip()) < min_length:
             return False
 
-        invalid_patterns: tuple[str] = (
+        invalid_patterns: tuple = (
             r'^x86', r'^family\s+\d+', r'^model\s+\d+', r'^stepping\s+\d+',
             r'^\d+$', r'^unknown', r'^generic', r'^to be filled',
             r'^not specified', r'^default string', r'^oem', r'^system manufacturer'
@@ -327,6 +352,18 @@ class _Processor(ABC):
 
         value_lower: str = value.lower().strip()
         return not any(re.match(pattern, value_lower) for pattern in invalid_patterns)
+
+    @staticmethod
+    def _simplify_cpu_name(name: str) -> str:
+        """Clean CPU name: 'Intel(R) Core(TM) i5-7300U CPU @ 2.60GHz' -> 'Intel Core i5-7300U'"""
+
+        # Remove trademarks, frequency, and extra words
+        clean = re.sub(r'\(R\)|\(TM\)|\(C\)|®|™|©', '', name)
+        clean = re.sub(r'\s*@\s*[\d.]+\s*[GMK]?Hz.*$', '', clean, re.IGNORECASE)
+        clean = re.sub(r'\s+(CPU|Processor)(\s|$)', ' ', clean, re.IGNORECASE)
+        clean = re.sub(r'\s+', ' ', clean).strip()
+
+        return clean or "Unknown CPU"
 
     def _estimate_cpu_lithography(self) -> int:
         """ This method will estimate the cpu lithography value"""
@@ -351,7 +388,7 @@ class _Processor(ABC):
 
     @staticmethod
     def _format_bytes(size_bytes: int) -> str:
-        """Format bytes into human readable format"""
+        """Format bytes into human-readable format"""
         if size_bytes >= 1024 ** 3:
             return f"{size_bytes / (1024 ** 3):.2f} GB"
         elif size_bytes >= 1024 ** 2:
@@ -368,79 +405,13 @@ class _Processor(ABC):
             return f"{size_kb / 1024:.1f} MB"
         return f"{size_kb} KB"
 
-
-class _Sensors(ABC):
-    """Abstract base class for system sensor monitoring.
-
-    This class defines the interface for retrieving various system sensor readings
-    like CPU clock speed, voltage, temperature, and usage statistics.
-    """
-
-    @abstractmethod
-    def get_clock_speed(self, friendly: bool = False) -> Union[float, str]:
-        """Get the current CPU clock speed.
-
-        Args:
-            friendly: If True, returns a human-readable string with units.
-                     If False, returns speed in MHz/GHz as float.
-
-        Returns:
-            float: Clock speed in MHz/GHz when friendly=False
-            str: Formatted string (e.g., "3.5 GHz") when friendly=True
-        """
-        pass
-
-    @abstractmethod
-    def get_cpu_voltage(self, friendly: bool = False) -> Union[float, str]:
-        """Get the current CPU voltage.
-
-        Args:
-            friendly: If True, returns a human-readable string with units.
-                     If False, returns voltage as float.
-
-        Returns:
-            float: Voltage in volts when friendly=False
-            str: Formatted string (e.g., "1.2V") when friendly=True
-        """
-        pass
-
-    @abstractmethod
-    def get_cpu_temperature(self,
-                            friendly: bool = False,
-                            sensor_id: Optional[int] = None) -> Union[float, str, List[Union[float, str]]]:
-        """Get CPU temperature reading(s).
-
-        Args:
-            friendly: If True, returns a human-readable string with units.
-                     If False, returns temperature as float.
-            sensor_id: Specific sensor to query. If None, returns all sensors.
-
-        Returns:
-            float: Temperature in Celsius when friendly=False and sensor_id specified
-            str: Formatted string (e.g., "45°C") when friendly=True and sensor_id specified
-            List: All sensor readings when sensor_id=None
-        """
-        pass
-
-    @abstractmethod
-    def get_cpu_usage(self,
-                      per_core: bool = False,
-                      interval: float = 0.1) -> Union[float, Tuple[float, ...]]:
-        """Get CPU usage percentage.
-
-        Args:
-            per_core: If True, returns usage for each core.
-                     If False, returns aggregate usage.
-            interval: Measurement interval in seconds.
-
-        Returns:
-            float: Aggregate CPU usage (0-100%) when per_core=False
-            Tuple: Per-core usage percentages when per_core=True
-        """
-        pass
+    @staticmethod
+    def _get_die_size() -> int:
+        """ This method will estimate the cpu die size in mm2"""
+        return 80  # return this as default value, this method will be updated later
 
 
-if _platform == 'win32':
+if Const.platform == 'win32':
 
     class _Const:
         """Constants for registry paths and commands"""
@@ -480,6 +451,10 @@ if _platform == 'win32':
             self._registry_handle = None
             self._init_registry()
 
+            self._model: Optional[str] = None
+            self._family: Optional[str] = None
+            self._stepping: Optional[str] = None
+
         def _init_registry(self) -> None:
             """Initialize registry handle for reuse"""
             try:
@@ -500,70 +475,25 @@ if _platform == 'win32':
                 self._cache[cache_key] = result
                 return result
 
-        def _read_registry_value(self, value_name: str, timeout: float = 0.5) -> Optional[str]:
-            """Fast registry value retrieval with timeout
+        def _read_registry_value(self, value_name: str) -> Optional[str]:
+            """Fast registry value retrieval - simplified and optimized
 
             Args:
                 value_name: The name of the registry value to read
-                timeout: Maximum time to wait for the operation (in seconds)
 
             Returns:
                 The registry value if successful, None otherwise
             """
             if not self._registry_handle:
-                if self._dev_mode:
-                    print("Registry handle not initialized")
                 return None
 
-            result = None
-            exception = None
-            traceback_info = None  # Store traceback only in dev mode
-
-            def get_value():
-                nonlocal result, exception, traceback_info
-                try:
-                    value, _ = winreg.QueryValueEx(self._registry_handle, value_name)
-                    result = str(value) if value is not None else None
-                except WindowsError as e:
-                    exception = e
-                    if self._dev_mode:
-                        traceback_info = traceback.format_exc()
-
-                except Exception as e:
-                    exception = e
-                    if self._dev_mode:
-                        traceback_info = traceback.format_exc()
-
-            thread = threading.Thread(target=get_value, name=f"RegRead_{value_name}")
-            thread.daemon = True
-            thread.start()
-
-            start_time = time.monotonic()
-            while thread.is_alive():
-                elapsed = time.monotonic() - start_time
-                if elapsed >= timeout:
-                    break
-                sleep_time = min(0.05, (timeout - elapsed) / 2)
-                time.sleep(sleep_time)
-
-            if thread.is_alive():
-                if self._dev_mode:
-                    print(f"Registry query timeout ({timeout}s) for {value_name}")
-                    # Show stack trace of where this was called from in dev mode
-                    print("Caller stack trace:\n" + ''.join(traceback.format_stack()[:-1]))
+            try:
+                value, _ = winreg.QueryValueEx(self._registry_handle, value_name)
+                return str(value) if value is not None else None
+            except (WindowsError, OSError):
+                # Registry operations are typically very fast (<1ms)
+                # If they fail, they fail immediately - no need for timeout/threading
                 return None
-
-            if exception is not None and self._dev_mode:
-                print(f"Error reading registry value '{value_name}':")
-                print(f"Exception type: {type(exception).__name__}")
-                print(f"Exception message: {str(exception)}")
-                if traceback_info:
-                    print("Full traceback:\n" + traceback_info)
-                if isinstance(exception, WindowsError):
-                    print(f"Windows error code: {exception.errno}")
-                    print(f"Win32 error message: {exception.strerror}")
-
-            return result
 
         def _execute_wmic_command(self, command: str, timeout: int = 5) -> Dict[str, str]:
             """Optimized WMIC execution with shorter timeout"""
@@ -634,151 +564,256 @@ if _platform == 'win32':
 
             return None
 
-        @property
         def name(self) -> ProcessorPyResult:
-            """Get CPU name using fastest available method"""
+            """Get CPU name using the fastest available method"""
 
             # Use active cache to return cpu name instantly
             # This will help when this method is called over and over
             if self._cpu_name:
-                return ProcessorPyResult(
-                    self._cpu_name.value,
-                    self._cpu_name.is_accurate,
-                    self._cpu_name.method
-                )
+                return self._cpu_name
 
             # Check for cached data
             if self._cache_handler.is_cache:
-                result: ProcessorPyResult = self.cached_info.get("name")
-                return ProcessorPyResult(value=result.value, is_accurate=result.is_accurate, method="cache")
+                result: ProcessorPyResult = self._cached_data.get("cpu_name")
+
+                return ProcessorPyResult(value=result['value'],
+                                         is_accurate=result['is_accurate'],
+                                         method="cache")
 
             # Method 1: Registry (fastest - ~1ms)
             reg_value = self._read_registry_value("ProcessorNameString")
 
             if reg_value and self._is_valid_string(reg_value):
-                original_value = reg_value.strip()
-                self._cpu_name = ProcessorPyResult(original_value.lower(), True, "registry")
+                original_value = self._simplify_cpu_name(reg_value.strip())
+                self._cpu_name = ProcessorPyResult(original_value, True, "registry")
+
                 return ProcessorPyResult(original_value, True, "registry")
-
-            # Method 2: Environment variables (very fast - ~0.1ms)
-            env_processor = os.environ.get('PROCESSOR_IDENTIFIER', '')
-
-            if env_processor and self._is_valid_string(env_processor):
-                self._cpu_name = ProcessorPyResult(env_processor.lower(), True, "environment")
-                return ProcessorPyResult(env_processor, True, "environment")
 
             # Method 3: WMIC (medium speed - ~100-500ms)
             wmic_result = self._execute_wmic_command(_Const.WMIC_COMMANDS['cpu_name'])
 
             if wmic_result.get('Name') and self._is_valid_string(wmic_result['Name']):
                 name = wmic_result['Name'].strip()
-                self._cpu_name = ProcessorPyResult(name.lower(), True, "wmic")
-                return ProcessorPyResult(name, True, "wmic")
-
-            # Method 4: PowerShell (slowest - ~1-3s)
-            ps_result = self._execute_powershell_command("Name")
-            if ps_result and self._is_valid_string(ps_result):
-                self._cpu_name = ProcessorPyResult(ps_result.lower(), True, "powershell")
-                return ProcessorPyResult(ps_result, True, "powershell")
+                self._cpu_name = ProcessorPyResult(name, True, "wmic")
+                return ProcessorPyResult(self._simplify_cpu_name(name), True, "wmic")
 
             # Fallback
             self._cpu_name = ProcessorPyResult("n/a", None, None)
             return ProcessorPyResult("n/a", None, None)
 
-        @property
         def release_date(self) -> ProcessorPyResult:
-            """Get CPU release date by parsing processor name patterns."""
+            """Optimized CPU release date detection with comprehensive manufacturer support."""
 
-            # Declare cpu information
-            cpu_info: str = self.name.value
-            current_year: int = datetime.datetime.now().year
+            cpu_info = self.name().value.strip()
+            if not cpu_info:
+                return ProcessorPyResult("n/a", False, "empty-name")
 
-            patterns: tuple[tuple] = (
-                # Intel: Core i7-10700K, Xeon E5-2697 v2, etc.
-                (r'(?:Core|Xeon|Pentium|Celeron|Atom)[\w\s-]*?([0-9]{4})[A-Za-z]?',
-                 lambda m: 2000 + int(m.group(1)) // 100 if int(m.group(1)) < 10000 else None),
+            current_year = datetime.datetime.now().year
+            current_quarter = ((datetime.datetime.now().month - 1) // 3) + 1
 
-                # AMD: Ryzen 9 5950X, EPYC 7351P, etc.
-                (r'(?:Ryzen|EPYC|Athlon|Threadripper|FX)[\w\s-]*?([0-9]{4})',
-                 lambda m: 2017 + (int(m.group(1)) - 1000) // 1000),
+            # Optimized CPU detection patterns with combined regex and direct lookups
+            detection_rules = [
+                # Intel Desktop (highest priority - most common)
+                (r'(?:Core\s+)?i[3579]-(\d{1,2})\d{3}[A-Za-z]*', {
+                    '14': (2024, 1, 0.95), '13': (2022, 4, 0.95), '12': (2021, 4, 0.95),
+                    '11': (2021, 1, 0.95), '10': (2019, 2, 0.95), '9': (2018, 4, 0.95),
+                    '8': (2017, 3, 0.95), '7': (2017, 1, 0.95), '6': (2015, 3, 0.95),
+                    '5': (2015, 1, 0.95), '4': (2013, 2, 0.95), '3': (2012, 2, 0.95),
+                    '2': (2011, 1, 0.95), '1': (2010, 1, 0.95)
+                }, 'intel-desktop'),
 
-                # Apple Silicon: M1, M1 Pro, A15 Bionic, etc.
-                (r'\bM([123])\b',
-                 lambda m: 2019 + int(m.group(1))),
-                (r'\bA([0-9]{2})\b',
-                 lambda m: 2010 + int(m.group(1)) - 4),  # A4 = 2010
+                # AMD Ryzen Desktop
+                (r'Ryzen\s+[3579]\s+(\d)000[XG]?[A-Za-z]*', {
+                    '8': (2024, 1, 0.95), '7': (2022, 4, 0.95), '6': (2022, 1, 0.95),
+                    '5': (2020, 4, 0.95), '4': (2020, 1, 0.95), '3': (2019, 3, 0.95),
+                    '2': (2018, 2, 0.95), '1': (2017, 2, 0.95), '9': (2019, 1, 0.95)
+                }, 'amd-ryzen'),
 
-                # ARM Cortex: Cortex-A78, Cortex-X2
-                (r'Cortex-[AX]([0-9]{2})',
-                 lambda m: 2010 + int(m.group(1))),
+                # Apple Silicon (M & A series)
+                (r'\b(M[1-4]|A1[0-7]|A[7-9])\b', {
+                    'M4': (2024, 2, 0.95), 'M3': (2023, 4, 0.95), 'M2': (2022, 2, 0.95), 'M1': (2020, 4, 0.95),
+                    'A17': (2023, 3, 0.95), 'A16': (2022, 3, 0.95), 'A15': (2021, 3, 0.95),
+                    'A14': (2020, 3, 0.95), 'A13': (2019, 3, 0.95), 'A12': (2018, 3, 0.95),
+                    'A11': (2017, 3, 0.95), 'A10': (2016, 3, 0.95), 'A9': (2015, 3, 0.95),
+                    'A8': (2014, 3, 0.95), 'A7': (2013, 3, 0.95)
+                }, 'apple'),
 
-                # Qualcomm Snapdragon: Snapdragon 8 Gen 2, SD8 Gen 1
-                (r'(?:Snapdragon|SD)\s*(?:[8|7])(?:\s*Gen\s*[1-9])?.*?([0-9]{3,4})',
-                 lambda m: 2015 + int(m.group(1)) // 100 if int(m.group(1)) >= 100 else None),
-            )
+                # Intel Mobile
+                (r'(?:Core\s+)?i[3579]-(\d{1,2})\d{2}[UYH][A-Za-z]*', {
+                    '13': (2023, 1, 0.9), '12': (2022, 1, 0.9), '11': (2021, 3, 0.9),
+                    '10': (2019, 3, 0.9), '8': (2018, 3, 0.9), '7': (2017, 3, 0.9),
+                    '6': (2016, 3, 0.9), '5': (2015, 1, 0.9), '4': (2014, 2, 0.9)
+                }, 'intel-mobile'),
 
-            for pattern, year_func in patterns:
-                if match := re.search(pattern, cpu_info, re.IGNORECASE):
-                    try:
-                        year = year_func(match)
-                        if year and 1990 < year <= current_year + 1:  # sanity check
-                            month = datetime.datetime.now().month
-                            quarter = ((month - 1) // 3) + 1 if year == current_year else 1
-                            return ProcessorPyResult(
-                                value=f"Q{quarter} {year}",
-                                is_accurate=True,
-                                method=f"{pattern.split('(')[0]}-pattern"
-                            )
-                    except Exception:
-                        continue
+                # AMD Mobile
+                (r'Ryzen\s+[3579]\s+(\d)000[UH][A-Za-z]*', {
+                    '7': (2023, 1, 0.9), '6': (2022, 1, 0.9), '5': (2021, 1, 0.9),
+                    '4': (2020, 1, 0.9), '3': (2019, 1, 0.9), '2': (2018, 4, 0.9)
+                }, 'amd-mobile'),
 
-            return ProcessorPyResult("n/a", None, None)
+                # Qualcomm Snapdragon
+                (r'Snapdragon\s+(?:8\s+Gen\s+([1-3])|(\d{3})|X\s+Elite)', {
+                    '1': (2021, 4, 0.9), '2': (2022, 4, 0.9), '3': (2023, 4, 0.9),
+                    '888': (2020, 4, 0.9), '865': (2019, 4, 0.9), '855': (2018, 4, 0.9),
+                    '845': (2017, 4, 0.9), '835': (2017, 1, 0.9), 'elite': (2024, 2, 0.9)
+                }, 'snapdragon'),
 
-        @property
-        def manufacturer(self) -> ProcessorPyResult:
-            """Get CPU manufacturer using fastest method"""
+                # Intel Xeon
+                (r'Xeon.*?(?:(\d{4})|(\d{2})\d{2})[A-Za-z]*', {
+                    '2023': (2023, 2, 0.85), '2022': (2022, 2, 0.85), '2021': (2021, 2, 0.85),
+                    '13': (2022, 4, 0.85), '12': (2021, 4, 0.85)
+                }, 'intel-xeon'),
 
-            # Check the memory cached value
-            if self._manufacturer:
-                return self._manufacturer
+                # AMD EPYC
+                (r'EPYC\s+(\d)000[A-Za-z]*', {
+                    '9': (2024, 2, 0.9), '7': (2022, 2, 0.9), '6': (2021, 2, 0.9),
+                    '4': (2021, 1, 0.9), '3': (2019, 2, 0.9), '2': (2018, 2, 0.9)
+                }, 'amd-epyc'),
 
-            # Method 1: Parse from CPU name (fastest if name is already cached)
-            cpu_name = self.name.value
-            # Declare vendors name strings
-            manufacturers: dict[str, str] = {
+                # ARM Cortex
+                (r'Cortex-([AX]\d{1,2})', {
+                    'A78': (2020, 2, 0.85), 'A77': (2019, 2, 0.85), 'A76': (2018, 2, 0.85),
+                    'A75': (2017, 2, 0.85), 'A73': (2016, 2, 0.85), 'A72': (2015, 2, 0.85),
+                    'X4': (2023, 2, 0.85), 'X3': (2022, 2, 0.85), 'X2': (2021, 2, 0.85), 'X1': (2020, 2, 0.85)
+                }, 'arm-cortex'),
+
+                # MediaTek
+                (r'(?:Dimensity\s+(\d{4})|Helio\s+([GP]\d{2}))', {
+                    '9300': (2023, 4, 0.8), '9200': (2022, 4, 0.8), '9000': (2021, 4, 0.8),
+                    '8100': (2022, 1, 0.8), '1200': (2021, 1, 0.8), 'G96': (2021, 3, 0.8)
+                }, 'mediatek'),
+
+                # Samsung Exynos
+                (r'Exynos\s+(\d{4})', {
+                    '2400': (2024, 1, 0.8), '2200': (2022, 1, 0.8), '2100': (2021, 1, 0.8),
+                    '1080': (2020, 3, 0.8), '990': (2019, 4, 0.8), '9820': (2019, 1, 0.8)
+                }, 'exynos')
+            ]
+
+            best_match = None
+            highest_confidence = 0.0
+
+            # Process each detection rule
+            for pattern, mapping, cpu_type in detection_rules:
+                match = re.search(pattern, cpu_info, re.IGNORECASE)
+                if not match:
+                    continue
+
+                # Extract key from match groups
+                key = None
+                for group in match.groups():
+                    if group:
+                        key = group
+                        break
+
+                if not key:
+                    continue
+
+                # Special handling for specific patterns
+                if cpu_type == 'snapdragon' and 'elite' in cpu_info.lower():
+                    key = 'elite'
+                elif cpu_type == 'apple':
+                    key = key.upper()
+
+                # Direct lookup
+                if key in mapping:
+                    year, quarter, confidence = mapping[key]
+                    if 1990 <= year <= current_year + 2 and confidence > highest_confidence:
+                        best_match = (year, quarter, confidence, f"{cpu_type}-{key}")
+                        highest_confidence = confidence
+
+                # Fallback estimation for Intel/AMD generations
+                elif key.isdigit() and len(key) <= 2:
+                    if cpu_type.startswith('intel'):
+                        est_year = 2008 + int(key)
+                        if 2008 <= est_year <= current_year + 1:
+                            confidence = 0.6
+                            if confidence > highest_confidence:
+                                best_match = (est_year, 2, confidence, f"{cpu_type}-est-{key}")
+                                highest_confidence = confidence
+                    elif cpu_type.startswith('amd'):
+                        est_year = 2017 + int(key)
+                        if 2017 <= est_year <= current_year + 1:
+                            confidence = 0.65
+                            if confidence > highest_confidence:
+                                best_match = (est_year, 2, confidence, f"{cpu_type}-est-{key}")
+                                highest_confidence = confidence
+
+            # Final fallback: extract year from CPU name
+            if not best_match:
+                year_match = re.search(r'\b(20[0-2][0-9])\b', cpu_info)
+                if year_match:
+                    year = int(year_match.group(1))
+                    if 2000 <= year <= current_year + 1:
+                        quarter = current_quarter if year == current_year else 2
+                        best_match = (year, quarter, 0.5, 'year-fallback')
+
+            # Return result
+            if best_match:
+                year, quarter, confidence, method = best_match
+
+                # Adjust quarter for current year
+                if year == current_year and quarter > current_quarter:
+                    quarter = current_quarter
+
+                return ProcessorPyResult(
+                    value=f"Q{quarter} {year}",
+                    is_accurate=confidence >= 0.8,
+                    method=method
+                )
+
+            return ProcessorPyResult("n/a", False, "no-match")
+
+        def vendor(self) -> ProcessorPyResult:
+            """Get a normalized CPU vendor (e.g., 'Intel', 'AMD') using fastest available method."""
+
+            if self._vendor:
+                return self._vendor
+
+            # Mapping all possible hints to canonical names
+            vendor_map: dict[str, str] = {
                 'intel': 'Intel',
+                'genuineintel': 'Intel',
                 'amd': 'AMD',
+                'authenticamd': 'AMD',
                 'arm': 'ARM Holdings',
+                'arm limited': 'ARM Holdings',
                 'qualcomm': 'Qualcomm',
                 'apple': 'Apple Inc.',
+                'apple inc.': 'Apple Inc.',
                 'nvidia': 'NVIDIA Corporation'
             }
 
-            for key, value in manufacturers.items():
-                if key in cpu_name:
-                    self._manufacturer = ProcessorPyResult(value.lower(), True, "name_parsing")
-                    return self._manufacturer
+            # Method 1: Parse from CPU name (fastest)
+            name_lower = self.name().value.lower()
+
+            for key, value in vendor_map.items():
+                if key in name_lower:
+                    self._vendor = ProcessorPyResult(value, True, "name_parsing")
+                    return self._vendor
 
             # Method 2: Registry
             reg_value = self._read_registry_value("VendorIdentifier")
             if reg_value and self._is_valid_string(reg_value):
-                self._manufacturer = ProcessorPyResult(reg_value.lower(), True, "registry")
-                return self._manufacturer
+                reg_key = reg_value.strip().lower()
+                value = vendor_map.get(reg_key, reg_key.title())
+                self._vendor = ProcessorPyResult(value, True, "registry")
+                return self._vendor
 
             # Method 3: WMIC
-            wmic_result = self._execute_wmic_command(_Const.WMIC_COMMANDS['cpu_manufacturer'])
-            if wmic_result.get('Manufacturer'):
-                manufacturer = wmic_result['Manufacturer']
-                self._manufacturer = ProcessorPyResult(manufacturer.lower(), True, "wmic")
-                return self._manufacturer
+            wmic_value = self._execute_wmic_command(_Const.WMIC_COMMANDS['cpu_manufacturer']).get('Manufacturer')
+            if wmic_value:
+                wmic_key = wmic_value.strip().lower()
+                value = vendor_map.get(wmic_key, wmic_key.title())
+                self._vendor = ProcessorPyResult(value, True, "wmic")
+                return self._vendor
 
             # Fallback
-            self._manufacturer = ProcessorPyResult("n/a", None, None)
-            return self._manufacturer
+            self._vendor = ProcessorPyResult("n/a", None, None)
+            return self._vendor
 
-        @property
         def architecture(self) -> ProcessorPyResult:
-            """Get CPU architecture using fastest method"""
+            """Get CPU architecture using the fastest method"""
             # Method 1: Environment variable (fastest)
             arch_env = os.environ.get('PROCESSOR_ARCHITECTURE', '')
             if arch_env:
@@ -800,52 +835,78 @@ if _platform == 'win32':
             return ProcessorPyResult("Unknown", False, "fallback")
 
         def get_cores(self, logical: bool = False) -> ProcessorPyResult:
-            """Get core count using Windows Registry with proper error handling and caching
+            """
+            Get core count using environment variable (logical) or Windows Registry (physical).
 
             Args:
-                logical: If True, returns logical cores (with hyperthreading)
-                         If False, returns physical cores
+                logical (bool): If True, return logical cores. If False, return physical cores.
 
             Returns:
-                ProcessorPyResult: Core count with accuracy and method info
+                ProcessorPyResult: Core count with source and accuracy info.
             """
-            # Check cache first
-            cache_key = f"cores_{'logical' if logical else 'physical'}"
-            if hasattr(self, f'_{cache_key}'):
-                return getattr(self, f'_{cache_key}')
+            cache_key = f"_cores_{'logical' if logical else 'physical'}"
 
-            # Try to get values from registry
-            registry_value = None
-            method = "registry"
-            is_accurate = True
+            # Early exit: return cached result if available
+            if hasattr(self, cache_key):
+                return getattr(self, cache_key)
 
-            try:
-                if logical:
-                    registry_value = self._read_registry_value("NumberOfLogicalProcessors")
-                else:
-                    # First try to get physical cores directly
-                    registry_value = self._read_registry_value("NumberOfCores")
+            result = None
 
-                    # Fallback to logical cores / 2 if physical not available
-                    if registry_value is None:
-                        logical_cores = self._read_registry_value("NumberOfLogicalProcessors")
-                        if logical_cores is not None:
-                            registry_value = max(1, int(logical_cores) // 2)
-                            method = "registry-estimated"
-                            is_accurate = False
+            if logical:
+                # Try environment variable first
+                try:
+                    env_cores = os.environ.get("NUMBER_OF_PROCESSORS")
+                    if env_cores and env_cores.isdigit():
+                        core_count = int(env_cores)
+                        if core_count > 0:
+                            result = ProcessorPyResult(value=core_count, is_accurate=True, method="environment")
+                except Exception as e:
+                    if self._developer_mode:
+                        print(f"[DEBUG] Environment variable method failed: {e}")
 
-                # Convert to int if we got a value
-                if registry_value is not None:
-                    registry_value = int(registry_value)
-            except (ValueError, TypeError):
-                registry_value = None
+                # Fallback to os.cpu_count() for logical cores
+                if not result:
+                    try:
+                        core_count = os.cpu_count()
+                        if core_count and core_count > 0:
+                            result = ProcessorPyResult(value=core_count, is_accurate=True, method="os.cpu_count")
+                    except Exception as e:
+                        if self._developer_mode:
+                            print(f"[DEBUG] os.cpu_count() fallback failed: {e}")
 
-            # Prepare result
-            if registry_value is not None and registry_value > 0:
-                result = ProcessorPyResult(registry_value, is_accurate, method)
-            else:
-                # Final fallback
-                result = ProcessorPyResult(1, False, "fallback")
+            else:  # Physical cores
+                # Try Windows Registry first
+                try:
+                    if not self._registry_handle:
+                        self._registry_handle = winreg.OpenKey(
+                            winreg.HKEY_LOCAL_MACHINE,
+                            r"HARDWARE\DESCRIPTION\System\CentralProcessor"
+                        )
+
+                    subkey_count = winreg.QueryInfoKey(self._registry_handle)[0]
+                    if subkey_count > 0:
+                        result = ProcessorPyResult(value=subkey_count, is_accurate=True, method="winreg")
+                except Exception as e:
+                    if self._developer_mode:
+                        print(f"[DEBUG] Registry method failed: {e}")
+
+                # Fallback to os.cpu_count() for physical cores (less accurate but better than nothing)
+                if not result:
+                    try:
+                        core_count = os.cpu_count()
+                        if core_count and core_count > 0:
+                            # Note: os.cpu_count() typically returns logical cores, so this is less accurate for physical
+                            result = ProcessorPyResult(value=core_count, is_accurate=False,
+                                                       method="os.cpu_count_fallback")
+                    except Exception as e:
+                        if self._developer_mode:
+                            print(f"[DEBUG] os.cpu_count() fallback failed: {e}")
+
+            # Final fallback if all methods failed
+            if not result:
+                result = ProcessorPyResult(value="unknown", is_accurate=False, method="error")
+                if self._developer_mode:
+                    print(f"[DEBUG] get_cores({logical}) - all methods failed")
 
             return result
 
@@ -870,36 +931,145 @@ if _platform == 'win32':
 
             return ProcessorPyResult("Unknown", False, "fallback")
 
-        @property
         def family(self) -> ProcessorPyResult:
             """Get the CPU family"""
             return ProcessorPyResult("n/a", None, None)
 
-        @property
         def stepping(self) -> ProcessorPyResult:
             """ This method will get the cpu stepping information"""
             return ProcessorPyResult("n/a", None, None)
 
-        @property
+        def model(self) -> ProcessorPyResult:
+            """ This method will get the cpu model information"""
+            return self._model
+
+        def _init_processor_identifier(self) -> Optional:
+            """ This method will get the cpu identifier from winreg that contain
+            cpu model, stepping, family and save it as cache after return the requested info
+
+            Args:
+                info_type: str, for example 'model' or 'stepping'
+
+            Returns: ProcessorPyResult
+
+            """
+
+            id = self._read_registry_value("PROCESSOR_IDENTIFIER")
+            return id
+
+
         def socket(self) -> ProcessorPyResult:
-            """Get CPU socket information"""
-            # Method 1: Registry
-            reg_value = self._read_registry_value("Identifier")
-            if reg_value and self._is_valid_string(reg_value):
-                return ProcessorPyResult(reg_value, True, "registry")
+            """Get CPU socket/packaging information using all available detection methods"""
 
-            # Method 2: WMIC
-            wmic_result = self._execute_wmic_command(_Const.WMIC_COMMANDS['cpu_socket'])
-            socket = wmic_result.get('SocketDesignation', '')
-            if socket and self._is_valid_string(socket):
-                return ProcessorPyResult(socket, True, "wmic")
+            # Get cpu name string
+            cpu_name: str = self.name().value.strip()
+            socket_info = "n/a"
 
-            # Method 3: PowerShell (slowest)
-            ps_result = self._execute_powershell_command("SocketDesignation")
-            if ps_result and self._is_valid_string(ps_result):
-                return ProcessorPyResult(ps_result, True, "powershell")
+            # Try to get CPUID info if available
+            try:
+                vendor = getattr(self, 'cpuid_vendor', lambda: "")()
+                family = getattr(self, 'cpuid_family', lambda: 0)()
+                model = getattr(self, 'cpuid_model', lambda: 0)()
 
-            return ProcessorPyResult("Unknown", False, "fallback")
+            except Exception:
+                vendor, family, model = "", 0, 0
+
+            # Intel CPUID-based detection
+            if vendor == "GenuineIntel":
+                # Desktop/Server Sockets
+                if family == 6:
+                    # LGA1700 (12th-14th Gen)
+                    if model in (0x97, 0x9A, 0xB7, 0xBF, 0xC6, 0xCF):
+                        socket_info = "LGA1700"
+                    # LGA1200 (10th-11th Gen)
+                    elif model in (0xA5, 0xA6, 0xA7):
+                        socket_info = "LGA1200"
+                    # LGA1151 (6th-9th Gen)
+                    elif model in (0x4E, 0x5E, 0x8E, 0x9E):
+                        socket_info = "LGA1151"
+                    # LGA2066 (Skylake-X)
+                    elif model == 0x55:
+                        socket_info = "LGA2066"
+                    # LGA2011-3 (Haswell-E/Broadwell-E)
+                    elif model in (0x3F, 0x4F, 0x56):
+                        socket_info = "LGA2011-3"
+                    # LGA1150 (Haswell)
+                    elif model in (0x3C, 0x3F, 0x45, 0x46):
+                        socket_info = "LGA1150"
+                    # LGA1155 (Sandy/Ivy Bridge)
+                    elif model in (0x2A, 0x2D, 0x3A, 0x3E):
+                        socket_info = "LGA1155"
+                    # LGA1366 (Nehalem/Westmere)
+                    elif model in (0x1A, 0x1E, 0x1F, 0x2E, 0x25, 0x2C, 0x2F):
+                        socket_info = "LGA1366"
+                    # LGA775 (Core 2)
+                    elif model in (0x0F, 0x17, 0x1D):
+                        socket_info = "LGA775"
+
+            # AMD CPUID-based detection
+            elif vendor == "AuthenticAMD":
+                # Check for EPYC (Server)
+                if "EPYC" in cpu_name.upper():
+                    if "7" in cpu_name.split()[1][0]:  # EPYC 7003/7002
+                        socket_info = "SP3"
+                    elif "9" in cpu_name.split()[1][0]:  # EPYC 9004
+                        socket_info = "SP5"
+                # Ryzen Desktop
+                elif "Ryzen" in cpu_name:
+                    if "Threadripper" in cpu_name:
+                        if "PRO" in cpu_name:
+                            socket_info = "sWRX8"
+                        elif any(x in cpu_name for x in ["3970X", "3990X"]):
+                            socket_info = "sTRX4"
+                        else:
+                            socket_info = "TR4"
+                    elif "7" in cpu_name.split()[1][0]:  # Ryzen 7000 series
+                        socket_info = "AM5"
+                    else:
+                        socket_info = "AM4"
+
+            # If CPUID didn't identify, try name pattern matching
+            if socket_info == "n/a" and cpu_name:
+                # Intel Patterns
+                if re.search(r'(i[3579]-|Xeon.*W-|Xeon E[23567]-).*1[2345]\d{3}', cpu_name, re.I):
+                    socket_info = "LGA1700"
+                elif re.search(r'(i[3579]-|Xeon.*W-|Xeon E-).*1[01]\d{2}', cpu_name, re.I):
+                    socket_info = "LGA1200"
+                elif re.search(r'(i[3579]-|Xeon E[23]-).*[89]00', cpu_name, re.I):
+                    socket_info = "LGA1151"
+                elif re.search(r'(i[3579]-|Xeon E3-).*[67]00', cpu_name, re.I):
+                    socket_info = "LGA1151"
+                elif re.search(r'(Xeon|Core i[79] Extreme).*X?[56]\d{3}', cpu_name, re.I):
+                    socket_info = "LGA2066"
+
+                # AMD Patterns
+                elif re.search(r'Ryzen [79] [79]\d{2}', cpu_name, re.I):
+                    socket_info = "AM5"
+                elif re.search(r'Ryzen [3579] \d{4}', cpu_name, re.I):
+                    socket_info = "AM4"
+                elif re.search(r'Threadripper (29|39|59)', cpu_name, re.I):
+                    socket_info = "TR4" if "29" in cpu_name else "sTRX4"
+
+                # Apple Silicon
+                elif re.search(r'M[123] (Max|Pro)?', cpu_name, re.I):
+                    socket_info = "Apple FCBGA"
+
+                # ARM Chips
+                elif re.search(r'(Snapdragon|Tensor|Graviton|Ampere)', cpu_name, re.I):
+                    socket_info = "SOC Package"
+
+                # Mobile detection
+                elif any(x in cpu_name for x in ["U Series", "H Series", "Y Series", "Mobile"]):
+                    socket_info = "BGA"  # Generic mobile BGA package
+
+            # Final fallbacks
+            if socket_info == "n/a":
+                if "ARM" in cpu_name or any(x in cpu_name for x in ["Cortex", "Neoverse"]):
+                    socket_info = "SOC Package"
+                elif "Apple" in cpu_name:
+                    socket_info = "Apple SIP"
+
+            return ProcessorPyResult(socket_info, None, None)
 
         def get_cache_size(self, level: int, friendly: bool = False) -> ProcessorPyResult:
             """Get cache size for specified level (1, 2, or 3)"""
@@ -940,7 +1110,6 @@ if _platform == 'win32':
 
             return ProcessorPyResult("Unknown", False, "fallback")
 
-        @property
         def flags(self) -> Tuple[str, ...]:
             """Get CPU feature flags with manufacturer-specific optimizations and modern extensions.
 
@@ -951,7 +1120,7 @@ if _platform == 'win32':
                     - method: Source of the flags ('cpuid', 'estimated', or 'fallback')
             """
             # Normalize manufacturer string
-            manufacturer = self.manufacturer.value.strip()
+            manufacturer = self.vendor().value.strip()
 
             # Modern base flags (x86_64 common features)
             base_flags = [
@@ -1027,8 +1196,7 @@ if _platform == 'win32':
                 method="minimal_fallback"
             )
 
-        @property
-        def cpu_tdp(self) -> ProcessorPyResult:
+        def tdp(self) -> ProcessorPyResult:
             """
             Get Thermal Design Power (TDP) estimation using regex patterns.
 
@@ -1037,7 +1205,7 @@ if _platform == 'win32':
             """
 
             # Declare stripped lowered cpu name string
-            cpu_name: str = self.name.value.strip()
+            cpu_name: str = self.name().value.strip()
 
             # Check patterns in order of specificity
             all_patterns: list[Optional] = []
@@ -1053,7 +1221,7 @@ if _platform == 'win32':
                 all_patterns.extend(self._arm_patterns)
             else:
                 # Try all patterns if brand is unclear
-                all_patterns.extend(_intel_patterns + _amd_patterns + _apple_patterns + _arm_patterns)
+                all_patterns.extend(self._intel_patterns + self._amd_patterns + self._apple_patterns + self._arm_patterns)
 
             # Match patterns
             for pattern, tdp in all_patterns:
@@ -1090,9 +1258,182 @@ if _platform == 'win32':
             elif any(term in cpu_name for term in ['gaming', 'enthusiast', 'overclockable']):
                 return ProcessorPyResult(value=95, is_accurate=True, method="fallback")
 
-            return None
+            return ProcessorPyResult("n/a", None, None)
 
-        @property
+        def transistor_count(self) -> ProcessorPyResult:
+            """Estimate CPU transistor count based on lithography and die size.
+
+            Returns:
+                ProcessorPyResult: Estimated transistor count as human-readable string
+            """
+            try:
+                cpu_name = self.name().value
+                process_node = self.lithography().value  # in nm
+                die_size = self._get_die_size()  # in mm²
+
+                if not process_node or not die_size:
+                    return ProcessorPyResult("n/a", None, "Missing lithography or die size")
+
+                # Improved density model with better empirical constants
+                # Based on actual transistor densities from modern processors
+                node_nm = float(process_node)
+
+                # More accurate density estimation based on real-world data
+                if node_nm <= 3:  # 3nm and below
+                    base_density = 300_000_000  # ~300M transistors/mm²
+                elif node_nm <= 5:  # 4-5nm
+                    base_density = 170_000_000  # ~170M transistors/mm²
+                elif node_nm <= 7:  # 6-7nm
+                    base_density = 100_000_000  # ~100M transistors/mm²
+                elif node_nm <= 10:  # 8-10nm
+                    base_density = 50_000_000  # ~50M transistors/mm²
+                elif node_nm <= 14:  # 12-14nm
+                    base_density = 30_000_000  # ~30M transistors/mm²
+                elif node_nm <= 22:  # 16-22nm
+                    base_density = 15_000_000  # ~15M transistors/mm²
+                elif node_nm <= 32:  # 28-32nm
+                    base_density = 8_000_000  # ~8M transistors/mm²
+                elif node_nm <= 45:  # 40-45nm
+                    base_density = 4_000_000  # ~4M transistors/mm²
+                else:  # 65nm and above
+                    base_density = 2_000_000  # ~2M transistors/mm²
+
+                # Apply architecture efficiency factor (modern designs are more efficient)
+                if cpu_name and any(arch in cpu_name.lower() for arch in ['zen', 'core', 'm1', 'm2', 'm3']):
+                    efficiency_factor = 1.2  # Modern architectures pack more efficiently
+                else:
+                    efficiency_factor = 1.0
+
+                density = base_density * efficiency_factor
+                estimated_count = int(density * die_size)
+
+                # Better formatting with proper rounding
+                if estimated_count >= 1_000_000_000:
+                    billions = estimated_count / 1_000_000_000
+                    if billions >= 10:
+                        value = f"{billions:.0f} billion"
+                    else:
+                        value = f"{billions:.1f} billion".replace(".0 ", " ")
+                elif estimated_count >= 1_000_000:
+                    millions = estimated_count / 1_000_000
+                    if millions >= 100:
+                        value = f"{millions:.0f} million"
+                    else:
+                        value = f"{millions:.1f} million".replace(".0 ", " ")
+                else:
+                    value = f"{estimated_count:,}"
+
+                return ProcessorPyResult(
+                    value=value,
+                    is_accurate=False,
+                    method=f"Estimated using {node_nm}nm node and {die_size}mm² die (~{int(density / 1_000_000):.0f}M transistors/mm²)"
+                )
+
+            except Exception as e:
+                return ProcessorPyResult("n/a", None, f"Error during estimation: {e}")
+
+        def code_name(self) -> ProcessorPyResult:
+            """This method will determine the cpu code name string eg: ivy bridge, coffee lake"""
+            try:
+                cpu_name = self.name().value
+                if not cpu_name:
+                    return ProcessorPyResult("n/a", None, "CPU name not available")
+
+                cpu_lower = cpu_name.lower()
+
+                # Intel code names mapping
+                intel_codenames = {
+                    # Recent generations
+                    ('13th gen', 'raptor lake', 'i3-13', 'i5-13', 'i7-13', 'i9-13'): 'Raptor Lake',
+                    ('12th gen', 'alder lake', 'i3-12', 'i5-12', 'i7-12', 'i9-12'): 'Alder Lake',
+                    ('11th gen', 'rocket lake', 'tiger lake', 'i3-11', 'i5-11', 'i7-11',
+                     'i9-11'): 'Tiger Lake/Rocket Lake',
+                    ('10th gen', 'comet lake', 'ice lake', 'i3-10', 'i5-10', 'i7-10', 'i9-10'): 'Comet Lake/Ice Lake',
+                    ('9th gen', 'coffee lake', 'i3-9', 'i5-9', 'i7-9', 'i9-9'): 'Coffee Lake Refresh',
+                    ('8th gen', 'i3-8', 'i5-8', 'i7-8', 'i9-8'): 'Coffee Lake',
+                    ('7th gen', 'kaby lake', 'i3-7', 'i5-7', 'i7-7'): 'Kaby Lake',
+                    ('6th gen', 'skylake', 'i3-6', 'i5-6', 'i7-6'): 'Skylake',
+                    ('5th gen', 'broadwell', 'i3-5', 'i5-5', 'i7-5'): 'Broadwell',
+                    ('4th gen', 'haswell', 'i3-4', 'i5-4', 'i7-4'): 'Haswell',
+                    ('3rd gen', 'ivy bridge', 'i3-3', 'i5-3', 'i7-3'): 'Ivy Bridge',
+                    ('2nd gen', 'sandy bridge', 'i3-2', 'i5-2', 'i7-2'): 'Sandy Bridge',
+                    ('1st gen', 'nehalem', 'westmere', 'i3-1', 'i5-1', 'i7-1'): 'Nehalem/Westmere',
+                }
+
+                # AMD code names mapping
+                amd_codenames = {
+                    ('ryzen 7000', 'zen 4', '7950x', '7900x', '7700x', '7600x'): 'Zen 4 (Raphael)',
+                    ('ryzen 6000', 'zen 3+', '6980hx', '6900hx', '6800h'): 'Zen 3+ (Rembrandt)',
+                    ('ryzen 5000', 'zen 3', '5950x', '5900x', '5800x', '5600x'): 'Zen 3 (Vermeer)',
+                    ('ryzen 4000', 'zen 2', '4750g', '4650g', '4350g'): 'Zen 2 (Renoir)',
+                    ('ryzen 3000', '3950x', '3900x', '3800x', '3700x', '3600x'): 'Zen 2 (Matisse)',
+                    ('ryzen 2000', 'zen+', '2700x', '2600x', '2400g', '2200g'): 'Zen+ (Pinnacle Ridge)',
+                    ('ryzen 1000', 'zen', '1800x', '1700x', '1600x', '1500x'): 'Zen (Summit Ridge)',
+                }
+
+                # Apple code names mapping
+                apple_codenames = {
+                    ('m3', 'apple m3'): 'M3 (A17 Pro based)',
+                    ('m2', 'apple m2'): 'M2 (A15 based)',
+                    ('m1', 'apple m1'): 'M1 (A14 based)',
+                    ('a17', 'apple a17'): 'A17 Pro (Bionic)',
+                    ('a16', 'apple a16'): 'A16 Bionic',
+                    ('a15', 'apple a15'): 'A15 Bionic',
+                    ('a14', 'apple a14'): 'A14 Bionic',
+                }
+
+                # Check Intel codenames
+                for keywords, codename in intel_codenames.items():
+                    if any(keyword in cpu_lower for keyword in keywords):
+                        return ProcessorPyResult(codename, True, f"Identified from CPU name: {cpu_name}")
+
+                # Check AMD codenames
+                for keywords, codename in amd_codenames.items():
+                    if any(keyword in cpu_lower for keyword in keywords):
+                        return ProcessorPyResult(codename, True, f"Identified from CPU name: {cpu_name}")
+
+                # Check Apple codenames
+                for keywords, codename in apple_codenames.items():
+                    if any(keyword in cpu_lower for keyword in keywords):
+                        return ProcessorPyResult(codename, True, f"Identified from CPU name: {cpu_name}")
+
+                # Fallback: try to extract generation info
+                import re
+
+                # Intel generation pattern
+                intel_gen_match = re.search(r'i[3579]-(\d{1,2})\d{3}', cpu_lower)
+                if intel_gen_match:
+                    gen = int(intel_gen_match.group(1))
+                    if gen >= 13:
+                        return ProcessorPyResult("Raptor Lake (13th gen)", False,
+                                                 f"Estimated from model number: {cpu_name}")
+                    elif gen >= 12:
+                        return ProcessorPyResult("Alder Lake (12th gen)", False,
+                                                 f"Estimated from model number: {cpu_name}")
+                    elif gen >= 11:
+                        return ProcessorPyResult("Tiger Lake/Rocket Lake (11th gen)", False,
+                                                 f"Estimated from model number: {cpu_name}")
+                    elif gen >= 10:
+                        return ProcessorPyResult("Comet Lake/Ice Lake (10th gen)", False,
+                                                 f"Estimated from model number: {cpu_name}")
+
+                # AMD Ryzen generation pattern
+                ryzen_match = re.search(r'ryzen.*(\d)000', cpu_lower)
+                if ryzen_match:
+                    gen = int(ryzen_match.group(1))
+                    if gen >= 7:
+                        return ProcessorPyResult("Zen 4", False, f"Estimated from model number: {cpu_name}")
+                    elif gen >= 5:
+                        return ProcessorPyResult("Zen 3", False, f"Estimated from model number: {cpu_name}")
+                    elif gen >= 3:
+                        return ProcessorPyResult("Zen 2", False, f"Estimated from model number: {cpu_name}")
+
+                return ProcessorPyResult("Unknown", False, f"Could not determine codename for: {cpu_name}")
+
+            except Exception as e:
+                return ProcessorPyResult("n/a", None, f"Error determining codename: {e}")
+
+
         def lithography(self) -> ProcessorPyResult:
             """ This method will get the cpu lithography in nm"""
             """
@@ -1107,7 +1448,7 @@ if _platform == 'win32':
             """
 
             # Declare cpu name string
-            cpu_name: str = self.name.value.strip()
+            cpu_name: str = self.name().value.lower().strip()
 
             # Direct nm extraction (highest priority)
             nm_match = re.search(r"(\d+) ?nm", cpu_name)
@@ -1352,8 +1693,8 @@ if _platform == 'win32':
             try:
 
                 # For testing purposes, determine vendor from CPU name
-                cpu_name: str = self.name.value
-                vendor: str = self.manufacturer.value
+                cpu_name: str = self.name().value
+                vendor: str = self.vendor().value
 
                 # Intel Turbo Boost
                 if "intel" in vendor or "genuineintel" in vendor:
@@ -1403,7 +1744,6 @@ if _platform == 'win32':
             except Exception as e:
                 return ProcessorPyResult("unknown", False, f"detection_failed: {str(e)}")
 
-        @property
         def is_ecc(self) -> ProcessorPyResult:
             """
 
@@ -1416,7 +1756,7 @@ if _platform == 'win32':
 
             try:
                 cpu_name = self.name.value
-                vendor = self.manufacturer.value
+                vendor = self.vendor.value
 
                 # Intel ECC support
                 if "intel" in vendor or "genuineintel" in vendor:
@@ -1461,8 +1801,8 @@ if _platform == 'win32':
                     - method: Detection method used
             """
             try:
-                cpu_name = self.name.value
-                cpu_brand = self.manufacturer.value
+                cpu_name = self.name().value
+                cpu_brand = self.vendor().value
 
                 # Intel processors
                 if "intel" in cpu_brand:
@@ -1585,9 +1925,8 @@ if _platform == 'win32':
                 else:
                     logging.warning(error_msg)
 
-            return ProcessorPyResult(["unknown"], False, "pattern_match_failed")
+            return ProcessorPyResult("n/a", None, None)
 
-        @property
         def supported_memory_channels(self) -> ProcessorPyResult:
             """
             Detects supported memory channels based on CPU model patterns.
@@ -1600,8 +1939,8 @@ if _platform == 'win32':
             """
             try:
 
-                cpu_name = self.name.value
-                cpu_brand = self.manufacturer.value
+                cpu_name = self.name().value
+                cpu_brand = self.vendor().value
 
                 # Server/workstation chips typically have more channels
                 if "xeon" in cpu_name:
@@ -1660,7 +1999,6 @@ if _platform == 'win32':
 
             return ProcessorPyResult("unknown", False, "pattern_match_failed")
 
-        @property
         def supported_memory_bandwidth(self, friendly: bool = False) -> ProcessorPyResult:
             """Estimates memory bandwidth - always returns a value."""
 
@@ -1749,7 +2087,6 @@ if _platform == 'win32':
             else:
                 return ProcessorPyResult(round(practical, 1), not is_estimated, "calculated")
 
-        @property
         def supported_memory_size(self, friendly: bool = False) -> ProcessorPyResult:
             """
             Estimates maximum supported memory size based on CPU architecture.
@@ -1761,8 +2098,8 @@ if _platform == 'win32':
                 ProcessorPyResult with size in GB or friendly string
             """
             try:
-                cpu_name = self.name.value
-                cpu_brand = self.manufacturer.value
+                cpu_name = self.name().value
+                cpu_brand = self.vendor().value
 
                 # Server processors - highest capacity
                 if "xeon" in cpu_name:
@@ -1851,13 +2188,11 @@ if _platform == 'win32':
                     import traceback
                     traceback.print_exc()
                     raise
-                else:
-                    logging.warning(error_msg)
 
-            return ProcessorPyResult("unknown", False, "pattern_match_failed")
+            return ProcessorPyResult("n/a", None, None)
 
 
-elif _platforms == "linux":
+elif Const.platform == "linux":
 
     class Processor(_Processor):
 
