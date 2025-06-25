@@ -26,14 +26,6 @@ from functools import lru_cache
 from ._core import Const
 from ._core import *
 
-# Handle imports
-try:
-    import winreg
-    import ctypes
-    import ctypes.wintypes
-
-except ImportError:
-    pass
 
 # Declare basic ProcessorPy constants
 _supported_platforms: tuple = ("Windows", "Linux", "Darwin")
@@ -412,6 +404,11 @@ class _Processor(ABC):
 
 
 if Const.platform == 'win32':
+
+    import winreg
+    import ctypes
+    import ctypes.wintypes
+
 
     class _Const:
         """Constants for registry paths and commands"""
